@@ -5,6 +5,7 @@ from .algorithm import Result, ga, hc, sa
 from .core import (
     Dimensions,
     Package,
+    Problem,
     Truck,
     evaluate_state,
     generate_initial_state,
@@ -13,7 +14,10 @@ from .core import (
 
 
 ALGORITHMS = {
-    "Hill Climbing": hc.hill_climbing,
+    "Hill Climbing - Steepest-Ascent": hc.hill_climbing_steepest_ascent,
+    "Hill Climbing - Stochastic": hc.hill_climbing_stochastic,
+    "Hill Climbing - Sideways Move": hc.hill_climbing_sideways_move,
+    "Hill Climbing - Random Restart": hc.hill_climbing_random_restart,
     "Simulated Annealing": sa.simulated_annealing,
     "Genetic Algorithm": ga.genetic_algorithm,
 }
@@ -25,8 +29,8 @@ def generate_problem(package_count=30, seed=42, truck_count=1):
 
     rng = random.Random(seed)
     trucks = [
-        Truck(Dimensions(10, 20, 5), 500)
-        for _ in range(truck_count)
+        Truck(f"T{index + 1:03d}", Dimensions(10, 20, 5), 500)
+        for index in range(truck_count)
     ]
     packages = []
 
@@ -46,40 +50,37 @@ def generate_problem(package_count=30, seed=42, truck_count=1):
             )
         )
 
-    return trucks, packages
+    return Problem(trucks, packages)
 
 
 def prepare_initial_state(package_count=30, seed=42, truck_count=1):
-    trucks, packages = generate_problem(package_count, seed, truck_count)
-    state = generate_initial_state(
-        trucks,
-        packages,
-        seed=seed,
-        objective_number=1,
-    )
+    problem = generate_problem(package_count, seed, truck_count)
+    state = generate_initial_state(problem, seed=seed)
 
-    if not is_valid_state(state):
+    if not is_valid_state(problem, state):
         raise RuntimeError("generated initial state is invalid")
 
-    return state
+    return problem, state
 
 
-def state_rows(state):
+def state_rows(problem, state):
     rows = []
 
-    for package in state.packages:
-        inside = package.position is not None and package.truck_index is not None
-        dimensions = package.get_oriented_dimensions()
+    for placement in state.placements:
+        package = problem.get_package(placement.package_id)
+        position = placement.position
+        inside = position is not None and placement.truck_id is not None
+        dimensions = placement.orientation.apply(package.dimensions)
 
         rows.append(
             {
                 "package_id": package.id,
                 "status": "inside" if inside else "outside",
-                "truck": package.truck_index + 1 if inside else None,
-                "x": package.position.x if inside else None,
-                "y": package.position.y if inside else None,
-                "z": package.position.z if inside else None,
-                "orientation": package.orientation.name,
+                "truck": placement.truck_id if inside else None,
+                "x": position.x if inside else None,
+                "y": position.y if inside else None,
+                "z": position.z if inside else None,
+                "orientation": placement.orientation.name,
                 "width": dimensions.width,
                 "length": dimensions.length,
                 "height": dimensions.height,
@@ -93,21 +94,25 @@ def state_rows(state):
     return rows
 
 
-def state_metrics(state):
-    inside = state.get_inside_packages()
-    outside = state.get_outside_packages()
+def state_metrics(problem, state):
+    inside = state.get_inside_placements()
+    outside = state.get_outside_placements()
 
     return {
-        "objective": state.value,
+        "objective": evaluate_state(problem, state, 1),
         "loaded_packages": len(inside),
         "unloaded_packages": len(outside),
-        "loaded_weight": sum(package.weight for package in inside),
-        "capacity": sum(truck.max_capacity for truck in state.trucks),
+        "loaded_weight": sum(
+            problem.get_package(placement.package_id).weight
+            for placement in inside
+        ),
+        "capacity": sum(truck.max_capacity for truck in problem.trucks),
     }
 
 
 def run_algorithm(
     algorithm_name,
+    problem,
     initial_state,
     max_iterations=1000,
     seed=42,
@@ -115,10 +120,13 @@ def run_algorithm(
 ):
     if algorithm_name not in ALGORITHMS:
         raise ValueError(f"unknown algorithm: {algorithm_name}")
+    if not is_valid_state(problem, initial_state):
+        raise ValueError("initial state is invalid")
 
     algorithm = ALGORITHMS[algorithm_name]
     parameters = dict(algorithm_parameters or {})
     reserved_parameters = {
+        "problem",
         "state",
         "max_iterations",
         "seed",
@@ -131,6 +139,7 @@ def run_algorithm(
     working_state = initial_state.copy()
     started_at = perf_counter()
     result = algorithm(
+        problem,
         working_state,
         max_iterations=max_iterations,
         seed=seed,
@@ -145,17 +154,23 @@ def run_algorithm(
         raise RuntimeError(f"{algorithm_name} tidak memiliki final state")
     if result.best_state is None:
         raise RuntimeError(f"{algorithm_name} tidak memiliki best state")
-    if not is_valid_state(result.final_state):
+    if not is_valid_state(problem, result.final_state):
         raise RuntimeError(f"{algorithm_name} mengembalikan final state tidak valid")
-    if not is_valid_state(result.best_state):
+    if not is_valid_state(problem, result.best_state):
         raise RuntimeError(f"{algorithm_name} mengembalikan best state tidak valid")
 
-    evaluate_state(result.final_state, 1)
-    evaluate_state(result.best_state, 1)
-    metrics = state_metrics(result.best_state)
+    initial_snapshot = initial_state.copy()
+    initial_value = evaluate_state(problem, initial_snapshot, 1)
+    final_value = evaluate_state(problem, result.final_state, 1)
+    best_value = evaluate_state(problem, result.best_state, 1)
+    metrics = state_metrics(problem, result.best_state)
 
     result.algorithm = algorithm_name
-    result.initial_state = initial_state.copy()
+    result.problem = problem
+    result.initial_state = initial_snapshot
+    result.initial_value = initial_value
+    result.final_value = final_value
+    result.best_value = best_value
     result.execution_time = execution_time
     result.metrics.update(
         {
@@ -170,26 +185,34 @@ def run_algorithm(
     )
 
     if not result.objective_history:
-        result.objective_history.append(result.best_state.value)
+        result.objective_history.append(result.best_value)
 
     return result
 
 
 def run_all_algorithms(
+    problem,
     initial_state,
     max_iterations=1000,
     seed=42,
     parameters_by_algorithm=None,
+    algorithm_names=None,
 ):
     results = []
     errors = []
     parameters_by_algorithm = parameters_by_algorithm or {}
+    algorithm_names = algorithm_names or [
+        "Hill Climbing - Random Restart",
+        "Simulated Annealing",
+        "Genetic Algorithm",
+    ]
 
-    for algorithm_name in ALGORITHMS:
+    for algorithm_name in algorithm_names:
         try:
             results.append(
                 run_algorithm(
                     algorithm_name,
+                    problem,
                     initial_state,
                     max_iterations,
                     seed,

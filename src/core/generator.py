@@ -1,20 +1,23 @@
 import random
-from copy import deepcopy
 
 from .models import Axis, Orientation, Position
-from .objective import evaluate_state
-from .state import State
+from .state import Placement, State
+
+
+def _oriented_dimensions(problem, placement):
+    package = problem.get_package(placement.package_id)
+    return placement.orientation.apply(package.dimensions)
 
 
 def _interval_overlap(start_a, size_a, start_b, size_b):
     return max(start_a, start_b) < min(start_a + size_a, start_b + size_b)
 
 
-def _footprint_overlap(package_a, package_b):
-    position_a = package_a.position
-    position_b = package_b.position
-    size_a = package_a.get_oriented_dimensions()
-    size_b = package_b.get_oriented_dimensions()
+def _footprint_overlap(problem, placement_a, placement_b):
+    position_a = placement_a.position
+    position_b = placement_b.position
+    size_a = _oriented_dimensions(problem, placement_a)
+    size_b = _oriented_dimensions(problem, placement_b)
 
     return _interval_overlap(
         position_a.x,
@@ -29,14 +32,14 @@ def _footprint_overlap(package_a, package_b):
     )
 
 
-def _packages_overlap(package_a, package_b):
-    position_a = package_a.position
-    position_b = package_b.position
-    size_a = package_a.get_oriented_dimensions()
-    size_b = package_b.get_oriented_dimensions()
+def _placements_overlap(problem, placement_a, placement_b):
+    position_a = placement_a.position
+    position_b = placement_b.position
+    size_a = _oriented_dimensions(problem, placement_a)
+    size_b = _oriented_dimensions(problem, placement_b)
 
     return (
-        _footprint_overlap(package_a, package_b)
+        _footprint_overlap(problem, placement_a, placement_b)
         and _interval_overlap(
             position_a.z,
             size_a.height,
@@ -46,63 +49,81 @@ def _packages_overlap(package_a, package_b):
     )
 
 
-def is_valid_state(state):
-    for package in state.packages:
-        outside = package.truck_index is None and package.position is None
-        inside = package.truck_index is not None and package.position is not None
+def is_valid_state(problem, state):
+    placement_ids = [placement.package_id for placement in state.placements]
+
+    if len(placement_ids) != len(set(placement_ids)):
+        return False
+    if set(placement_ids) != set(problem.packages_by_id):
+        return False
+
+    for placement in state.placements:
+        position = placement.position
+        outside = placement.truck_id is None and position is None
+        inside = placement.truck_id is not None and position is not None
 
         if not outside and not inside:
             return False
-
-        if inside:
-            if not isinstance(package.truck_index, int):
-                return False
-            if package.truck_index < 0 or package.truck_index >= len(state.trucks):
-                return False
-
-    for truck_index, truck in enumerate(state.trucks):
-        packages = state.get_packages_in_truck(truck_index)
-        truck_size = truck.dimensions
-
-        if sum(package.weight for package in packages) > truck.max_capacity:
+        if not isinstance(placement.orientation, Orientation):
             return False
 
-        for package in packages:
-            position = package.position
-            size = package.get_oriented_dimensions()
+        if inside:
+            if placement.truck_id not in problem.trucks_by_id:
+                return False
+            if not isinstance(position, Position):
+                return False
+            if not all(isinstance(value, int) for value in position.as_tuple()):
+                return False
+
+    for truck in problem.trucks:
+        placements = state.get_placements_in_truck(truck.id)
+        loaded_weight = sum(
+            problem.get_package(placement.package_id).weight
+            for placement in placements
+        )
+
+        if loaded_weight > truck.max_capacity:
+            return False
+
+        for placement in placements:
+            position = placement.position
+            size = _oriented_dimensions(problem, placement)
 
             if position.x < 0 or position.y < 0 or position.z < 0:
                 return False
-            if position.x + size.width > truck_size.width:
+            if position.x + size.width > truck.dimensions.width:
                 return False
-            if position.y + size.length > truck_size.length:
+            if position.y + size.length > truck.dimensions.length:
                 return False
-            if position.z + size.height > truck_size.height:
+            if position.z + size.height > truck.dimensions.height:
                 return False
 
-        for index, package_a in enumerate(packages):
-            for package_b in packages[index + 1 :]:
-                if _packages_overlap(package_a, package_b):
+        for index, placement_a in enumerate(placements):
+            for placement_b in placements[index + 1 :]:
+                if _placements_overlap(problem, placement_a, placement_b):
                     return False
 
-        for upper in packages:
-            if upper.position.z == 0:
+        for upper in placements:
+            upper_position = upper.position
+
+            if upper_position.z == 0:
                 continue
 
             has_support = False
 
-            for lower in packages:
+            for lower in placements:
                 if lower is upper:
                     continue
 
-                lower_size = lower.get_oriented_dimensions()
-                lower_top = lower.position.z + lower_size.height
+                lower_position = lower.position
+                lower_size = _oriented_dimensions(problem, lower)
+                lower_top = lower_position.z + lower_size.height
 
-                if lower_top != upper.position.z:
+                if lower_top != upper_position.z:
                     continue
-                if not _footprint_overlap(lower, upper):
+                if not _footprint_overlap(problem, lower, upper):
                     continue
-                if lower.is_fragile:
+                if problem.get_package(lower.package_id).is_fragile:
                     return False
 
                 has_support = True
@@ -116,251 +137,238 @@ def is_valid_state(state):
 def state_signature(state):
     result = []
 
-    for package in state.packages:
-        position = None
-        if package.position is not None:
-            position = package.position.as_tuple()
-
+    for placement in state.placements:
+        position = placement.position
+        position_tuple = position.as_tuple() if position is not None else None
         result.append(
-            (package.id, package.truck_index, position, package.orientation)
+            (
+                placement.package_id,
+                placement.truck_id,
+                position_tuple,
+                placement.orientation,
+            )
         )
 
     result.sort(key=lambda item: item[0])
     return tuple(result)
 
 
-def _find_package(state, package_id):
-    for package in state.packages:
-        if package.id == package_id:
-            return package
-
-    raise ValueError(f"package {package_id!r} not found")
-
-
-def swap(state, first_package_id, second_package_id, objective_number=1):
+def swap(problem, state, first_package_id, second_package_id):
     if first_package_id == second_package_id:
         raise ValueError("package ids must be different")
 
     neighbor = state.copy()
-    package_a = _find_package(neighbor, first_package_id)
-    package_b = _find_package(neighbor, second_package_id)
+    placement_a = neighbor.get_placement(first_package_id)
+    placement_b = neighbor.get_placement(second_package_id)
 
-    package_a.truck_index, package_b.truck_index = (
-        package_b.truck_index,
-        package_a.truck_index,
+    placement_a.truck_id, placement_b.truck_id = (
+        placement_b.truck_id,
+        placement_a.truck_id,
     )
-    package_a.position, package_b.position = (
-        package_b.position,
-        package_a.position,
+    placement_a.position, placement_b.position = (
+        placement_b.position,
+        placement_a.position,
     )
 
     if state_signature(neighbor) == state_signature(state):
         return None
-    if not is_valid_state(neighbor):
+    if not is_valid_state(problem, neighbor):
         return None
 
-    evaluate_state(neighbor, objective_number)
     return neighbor
 
 
-def move(state, package_id, truck_index, position, objective_number=1):
-    if (truck_index is None) != (position is None):
-        raise ValueError("truck_index and position must both be set or both be None")
+def move(problem, state, package_id, truck_id, position):
+    if (truck_id is None) != (position is None):
+        raise ValueError("truck_id and position must both be set or both be None")
+    if truck_id is not None:
+        problem.get_truck(truck_id)
 
     neighbor = state.copy()
-    package = _find_package(neighbor, package_id)
-
-    if truck_index is None:
-        package.move_outside()
-    else:
-        package.move(truck_index, position)
+    placement = neighbor.get_placement(package_id)
+    placement.truck_id = truck_id
+    placement.position = position
 
     if state_signature(neighbor) == state_signature(state):
         return None
-    if not is_valid_state(neighbor):
+    if not is_valid_state(problem, neighbor):
         return None
 
-    evaluate_state(neighbor, objective_number)
     return neighbor
 
 
-def rotate(state, package_id, axis, objective_number=1):
+def rotate(problem, state, package_id, axis):
     neighbor = state.copy()
-    package = _find_package(neighbor, package_id)
-    package.rotate(axis)
+    placement = neighbor.get_placement(package_id)
+    placement.orientation = placement.orientation.rotated(axis)
 
     if state_signature(neighbor) == state_signature(state):
         return None
-    if not is_valid_state(neighbor):
+    if not is_valid_state(problem, neighbor):
         return None
 
-    evaluate_state(neighbor, objective_number)
     return neighbor
 
 
 def generate_initial_state(
-    trucks,
-    packages,
+    problem,
     seed=None,
     placement_probability=0.7,
     max_attempts=100,
-    objective_number=1,
 ):
-    rng = random.Random(seed)
-    generated_packages = deepcopy(packages)
-    state = State(deepcopy(trucks), generated_packages)
-
-    if not state.trucks:
+    if not problem.trucks:
         raise ValueError("at least one truck is required")
 
-    for package in generated_packages:
-        package.move_outside()
-        package.orientation = rng.choice(list(Orientation))
-
-    order = list(range(len(generated_packages)))
+    rng = random.Random(seed)
+    placements = [
+        Placement(
+            package.id,
+            orientation=rng.choice(list(Orientation)),
+        )
+        for package in problem.packages
+    ]
+    state = State(placements)
+    order = list(range(len(placements)))
     rng.shuffle(order)
 
     for index in order:
-        package = state.packages[index]
+        placement = state.placements[index]
 
         if rng.random() > placement_probability:
             continue
 
         for _ in range(max_attempts):
-            truck_index = rng.randrange(len(state.trucks))
-            truck_size = state.trucks[truck_index].dimensions
-            package.orientation = rng.choice(list(Orientation))
-            size = package.get_oriented_dimensions()
+            truck = rng.choice(problem.trucks)
+            placement.orientation = rng.choice(list(Orientation))
+            size = _oriented_dimensions(problem, placement)
 
-            if size.width > truck_size.width:
+            if size.width > truck.dimensions.width:
                 continue
-            if size.length > truck_size.length:
+            if size.length > truck.dimensions.length:
                 continue
-            if size.height > truck_size.height:
+            if size.height > truck.dimensions.height:
                 continue
 
-            package.move(
-                truck_index,
-                Position(
-                    rng.randint(0, truck_size.width - size.width),
-                    rng.randint(0, truck_size.length - size.length),
-                    0,
-                ),
+            placement.truck_id = truck.id
+            placement.position = Position(
+                rng.randint(0, truck.dimensions.width - size.width),
+                rng.randint(0, truck.dimensions.length - size.length),
+                0,
             )
 
-            if is_valid_state(state):
+            if is_valid_state(problem, state):
                 break
 
-            package.move_outside()
+            placement.truck_id = None
+            placement.position = None
 
-    evaluate_state(state, objective_number)
     return state
 
 
-def _swap_neighbor(state, rng, objective_number):
-    if len(state.packages) < 2:
+def _swap_neighbor(problem, state, rng):
+    if len(state.placements) < 2:
         return None
 
-    package_a, package_b = rng.sample(state.packages, 2)
-    return swap(state, package_a.id, package_b.id, objective_number)
+    placement_a, placement_b = rng.sample(state.placements, 2)
+    return swap(
+        problem,
+        state,
+        placement_a.package_id,
+        placement_b.package_id,
+    )
 
 
-def _move_neighbor(state, rng, objective_number):
-    package = rng.choice(state.packages)
+def _move_neighbor(problem, state, rng):
+    placement = rng.choice(state.placements)
 
-    if package.position is not None and rng.random() < 0.2:
-        return move(state, package.id, None, None, objective_number)
+    if placement.position is not None and rng.random() < 0.2:
+        return move(problem, state, placement.package_id, None, None)
 
-    truck_index = rng.randrange(len(state.trucks))
-    truck_size = state.trucks[truck_index].dimensions
-    size = package.get_oriented_dimensions()
+    truck = rng.choice(problem.trucks)
+    size = _oriented_dimensions(problem, placement)
 
-    if size.width > truck_size.width:
+    if size.width > truck.dimensions.width:
         return None
-    if size.length > truck_size.length:
+    if size.length > truck.dimensions.length:
         return None
-    if size.height > truck_size.height:
+    if size.height > truck.dimensions.height:
         return None
 
     possible_z = [0]
 
-    for lower in state.get_packages_in_truck(truck_index):
-        if lower is package or lower.is_fragile:
+    for lower in state.get_placements_in_truck(truck.id):
+        if lower.package_id == placement.package_id:
+            continue
+        if problem.get_package(lower.package_id).is_fragile:
             continue
 
-        lower_size = lower.get_oriented_dimensions()
-        top = lower.position.z + lower_size.height
+        lower_position = lower.position
+        lower_size = _oriented_dimensions(problem, lower)
+        top = lower_position.z + lower_size.height
 
-        if top + size.height <= truck_size.height:
+        if top + size.height <= truck.dimensions.height:
             possible_z.append(top)
 
     return move(
+        problem,
         state,
-        package.id,
-        truck_index,
+        placement.package_id,
+        truck.id,
         Position(
-            rng.randint(0, truck_size.width - size.width),
-            rng.randint(0, truck_size.length - size.length),
+            rng.randint(0, truck.dimensions.width - size.width),
+            rng.randint(0, truck.dimensions.length - size.length),
             rng.choice(possible_z),
         ),
-        objective_number,
     )
 
 
-def _rotate_neighbor(state, rng, objective_number):
-    package = rng.choice(state.packages)
+def _rotate_neighbor(problem, state, rng):
+    placement = rng.choice(state.placements)
     return rotate(
+        problem,
         state,
-        package.id,
+        placement.package_id,
         rng.choice(list(Axis)),
-        objective_number,
     )
 
 
-def generate_random_neighbor(
-    state,
-    objective_number=1,
-    seed=None,
-    max_attempts=100,
-):
-    if not state.trucks:
-        raise ValueError("state has no trucks")
-    if not state.packages:
-        raise ValueError("state has no packages")
+def generate_random_neighbor(problem, state, seed=None, max_attempts=100):
+    if not problem.trucks:
+        raise ValueError("problem has no trucks")
+    if not state.placements:
+        raise ValueError("state has no placements")
 
     rng = random.Random(seed)
     operations = [_move_neighbor, _rotate_neighbor]
 
-    if len(state.packages) >= 2:
+    if len(state.placements) >= 2:
         operations.append(_swap_neighbor)
 
     for _ in range(max_attempts):
         operation = rng.choice(operations)
-        neighbor = operation(state, rng, objective_number)
+        neighbor = operation(problem, state, rng)
 
-        if neighbor is None:
-            continue
-
-        return neighbor
+        if neighbor is not None:
+            return neighbor
 
     raise RuntimeError("failed to generate a valid neighbor")
 
 
-def generate_all_neighbors(state, objective_number=1):
-    if not state.trucks:
-        raise ValueError("state has no trucks")
-    if not state.packages:
-        raise ValueError("state has no packages")
+def generate_all_neighbors(problem, state):
+    if not problem.trucks:
+        raise ValueError("problem has no trucks")
+    if not state.placements:
+        raise ValueError("state has no placements")
 
     seen = {state_signature(state)}
 
-    for first_index in range(len(state.packages)):
-        for second_index in range(first_index + 1, len(state.packages)):
+    for first_index in range(len(state.placements)):
+        for second_index in range(first_index + 1, len(state.placements)):
             neighbor = swap(
+                problem,
                 state,
-                state.packages[first_index].id,
-                state.packages[second_index].id,
-                objective_number,
+                state.placements[first_index].package_id,
+                state.placements[second_index].package_id,
             )
 
             if neighbor is None:
@@ -368,20 +376,18 @@ def generate_all_neighbors(state, objective_number=1):
 
             signature = state_signature(neighbor)
 
-            if signature in seen:
-                continue
+            if signature not in seen:
+                seen.add(signature)
+                yield neighbor
 
-            seen.add(signature)
-            yield neighbor
-
-    for package_index, original_package in enumerate(state.packages):
-        if original_package.position is not None:
+    for original_placement in state.placements:
+        if original_placement.position is not None:
             neighbor = move(
+                problem,
                 state,
-                original_package.id,
+                original_placement.package_id,
                 None,
                 None,
-                objective_number,
             )
 
             if neighbor is not None:
@@ -391,39 +397,40 @@ def generate_all_neighbors(state, objective_number=1):
                     seen.add(signature)
                     yield neighbor
 
-        size = original_package.get_oriented_dimensions()
+        size = _oriented_dimensions(problem, original_placement)
 
-        for truck_index, truck in enumerate(state.trucks):
-            truck_size = truck.dimensions
-
-            if size.width > truck_size.width:
+        for truck in problem.trucks:
+            if size.width > truck.dimensions.width:
                 continue
-            if size.length > truck_size.length:
+            if size.length > truck.dimensions.length:
                 continue
-            if size.height > truck_size.height:
+            if size.height > truck.dimensions.height:
                 continue
 
             possible_z = {0}
 
-            for lower in state.get_packages_in_truck(truck_index):
-                if lower is original_package or lower.is_fragile:
+            for lower in state.get_placements_in_truck(truck.id):
+                if lower.package_id == original_placement.package_id:
+                    continue
+                if problem.get_package(lower.package_id).is_fragile:
                     continue
 
-                lower_size = lower.get_oriented_dimensions()
-                top = lower.position.z + lower_size.height
+                lower_position = lower.position
+                lower_size = _oriented_dimensions(problem, lower)
+                top = lower_position.z + lower_size.height
 
-                if top + size.height <= truck_size.height:
+                if top + size.height <= truck.dimensions.height:
                     possible_z.add(top)
 
-            for x in range(truck_size.width - size.width + 1):
-                for y in range(truck_size.length - size.length + 1):
+            for x in range(truck.dimensions.width - size.width + 1):
+                for y in range(truck.dimensions.length - size.length + 1):
                     for z in sorted(possible_z):
                         neighbor = move(
+                            problem,
                             state,
-                            original_package.id,
-                            truck_index,
+                            original_placement.package_id,
+                            truck.id,
                             Position(x, y, z),
-                            objective_number,
                         )
 
                         if neighbor is None:
@@ -431,19 +438,17 @@ def generate_all_neighbors(state, objective_number=1):
 
                         signature = state_signature(neighbor)
 
-                        if signature in seen:
-                            continue
+                        if signature not in seen:
+                            seen.add(signature)
+                            yield neighbor
 
-                        seen.add(signature)
-                        yield neighbor
-
-    for package_index in range(len(state.packages)):
+    for placement in state.placements:
         for axis in Axis:
             neighbor = rotate(
+                problem,
                 state,
-                state.packages[package_index].id,
+                placement.package_id,
                 axis,
-                objective_number,
             )
 
             if neighbor is None:
@@ -451,8 +456,6 @@ def generate_all_neighbors(state, objective_number=1):
 
             signature = state_signature(neighbor)
 
-            if signature in seen:
-                continue
-
-            seen.add(signature)
-            yield neighbor
+            if signature not in seen:
+                seen.add(signature)
+                yield neighbor

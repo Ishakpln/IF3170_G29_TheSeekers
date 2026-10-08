@@ -63,9 +63,6 @@ class Package:
         weight,
         is_fragile,
         eta,
-        position=None,
-        orientation=Orientation.WLH,
-        truck_index=None,
     ):
         self.id = package_id
         self.dimensions = dimensions
@@ -73,26 +70,35 @@ class Package:
         self.weight = weight
         self.is_fragile = is_fragile
         self.eta = eta
-        self.position = position
-        self.orientation = orientation
-        self.truck_index = truck_index
-
-    def get_oriented_dimensions(self):
-        return self.orientation.apply(self.dimensions)
-
-    def move(self, truck_index, position):
-        self.truck_index = truck_index
-        self.position = position
-
-    def move_outside(self):
-        self.truck_index = None
-        self.position = None
-
-    def rotate(self, axis):
-        self.orientation = self.orientation.rotated(axis)
 
 
 class Truck:
-    def __init__(self, dimensions, max_capacity):
+    def __init__(self, truck_id, dimensions, max_capacity):
+        self.id = truck_id
         self.dimensions = dimensions
         self.max_capacity = max_capacity
+
+
+class Problem:
+    def __init__(self, trucks, packages):
+        self.trucks = list(trucks)
+        self.packages = list(packages)
+        self.trucks_by_id = {truck.id: truck for truck in self.trucks}
+        self.packages_by_id = {package.id: package for package in self.packages}
+
+        if len(self.trucks_by_id) != len(self.trucks):
+            raise ValueError("truck ids must be unique")
+        if len(self.packages_by_id) != len(self.packages):
+            raise ValueError("package ids must be unique")
+
+    def get_truck(self, truck_id):
+        if truck_id not in self.trucks_by_id:
+            raise ValueError(f"truck {truck_id!r} not found")
+
+        return self.trucks_by_id[truck_id]
+
+    def get_package(self, package_id):
+        if package_id not in self.packages_by_id:
+            raise ValueError(f"package {package_id!r} not found")
+
+        return self.packages_by_id[package_id]

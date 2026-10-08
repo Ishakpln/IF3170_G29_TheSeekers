@@ -8,7 +8,7 @@ from .generator import (
     state_signature,
     swap,
 )
-from .models import Axis, Dimensions, Orientation, Package, Position, Truck
+from .models import Axis, Dimensions, Orientation, Package, Position, Problem, Truck
 from .objective import (
     evaluate_obj_func,
     evaluate_obj_func2,
@@ -18,14 +18,19 @@ from .objective import (
     evaluate_state,
     get_objective_function,
 )
-from .state import State
+from .res import Result, ResultContainer
+from .state import Placement, State
 
 __all__ = [
     "Axis",
     "Dimensions",
     "Orientation",
     "Package",
+    "Placement",
     "Position",
+    "Problem",
+    "Result",
+    "ResultContainer",
     "State",
     "Truck",
     "evaluate_obj_func",

@@ -5,34 +5,41 @@ from src.orchestration import (
     state_metrics,
     state_rows,
 )
-from src.core import state_signature
+from src.core import ResultContainer, state_signature
 
 
 ALGORITHM_NAMES = {
-    "hc": "Hill Climbing",
     "sa": "Simulated Annealing",
     "ga": "Genetic Algorithm",
+}
+
+HC_ALGORITHM_NAMES = {
+    "1": "Hill Climbing - Steepest-Ascent",
+    "2": "Hill Climbing - Stochastic",
+    "3": "Hill Climbing - Sideways Move",
+    "4": "Hill Climbing - Random Restart",
 }
 
 PACKAGE_COUNT = 30
 DATASET_SEED = 42
 DEFAULT_MAX_ITERATIONS = 1000
 DEFAULT_MAX_RESTARTS = 5
+DEFAULT_MAX_SIDEWAYS = 100
 DEFAULT_INITIAL_TEMPERATURE = 100.0
 DEFAULT_COOLING_RATE = 0.99
 DEFAULT_MINIMUM_TEMPERATURE = 0.01
 DEFAULT_POPULATION_SIZE = 20
 
 
-def print_state(state):
-    metrics = state_metrics(state)
+def print_state(problem, state):
+    metrics = state_metrics(problem, state)
     print(f'Value: {metrics["objective"]}')
     print(f'Loaded packages: {metrics["loaded_packages"]}')
     print(f'Unloaded packages: {metrics["unloaded_packages"]}')
     print(f'Loaded weight: {metrics["loaded_weight"]} / {metrics["capacity"]}')
     print("Packages:")
 
-    for package in state_rows(state):
+    for package in state_rows(problem, state):
         if package["status"] == "inside":
             placement = (
                 f'truck={package["truck"]}, '
@@ -51,7 +58,7 @@ def print_state(state):
         print(f'  {package["package_id"]}: {placement}, {details}')
 
 
-def print_result(result):
+def print_result(problem, result):
     print()
     print(f"=== {result.algorithm} ===")
     print(f"Execution time: {result.execution_time:.6f} seconds")
@@ -70,12 +77,12 @@ def print_result(result):
 
     if state_signature(result.final_state) == state_signature(result.best_state):
         print("Final / Best State:")
-        print_state(result.best_state)
+        print_state(problem, result.best_state)
     else:
         print("Final Visited State:")
-        print_state(result.final_state)
+        print_state(problem, result.final_state)
         print("Best State:")
-        print_state(result.best_state)
+        print_state(problem, result.best_state)
 
 
 def select_algorithm():
@@ -86,6 +93,34 @@ def select_algorithm():
             return choice
 
         print("Pilihan tidak valid.")
+
+
+def select_hc_algorithm():
+    print("Jenis Hill Climbing:")
+    print("  1. Steepest-Ascent")
+    print("  2. Stochastic")
+    print("  3. Sideways Move")
+    print("  4. Random Restart")
+
+    while True:
+        choice = input("Pilih jenis HC (1/2/3/4): ").strip()
+
+        if choice in HC_ALGORITHM_NAMES:
+            return HC_ALGORITHM_NAMES[choice]
+
+        print("Pilihan jenis HC tidak valid.")
+
+
+def select_yes_no(prompt):
+    while True:
+        choice = input(f"{prompt} (y/n): ").strip().lower()
+
+        if choice in ["y", "yes", "ya"]:
+            return True
+        if choice in ["n", "no", "tidak"]:
+            return False
+
+        print("Masukkan y atau n.")
 
 
 def select_truck_count():
@@ -146,17 +181,26 @@ def select_float(prompt, default, minimum, maximum=None):
         return result
 
 
-def select_algorithm_parameters(algorithm_choice):
+def select_algorithm_parameters(algorithm_choice, hc_algorithm_name=None):
     parameters = {}
 
     if algorithm_choice in ["hc", "all"]:
-        parameters["Hill Climbing"] = {
-            "max_restarts": select_integer(
+        hc_parameters = {}
+
+        if hc_algorithm_name == "Hill Climbing - Sideways Move":
+            hc_parameters["max_sideways"] = select_integer(
+                "Maximum sideways move HC",
+                DEFAULT_MAX_SIDEWAYS,
+                0,
+            )
+        elif hc_algorithm_name == "Hill Climbing - Random Restart":
+            hc_parameters["max_restarts"] = select_integer(
                 "Maximum restart HC",
                 DEFAULT_MAX_RESTARTS,
                 0,
             )
-        }
+
+        parameters[hc_algorithm_name] = hc_parameters
 
     if algorithm_choice in ["sa", "all"]:
         initial_temperature = select_float(
@@ -201,61 +245,126 @@ def select_algorithm_parameters(algorithm_choice):
     return parameters
 
 
+def save_result(container, result):
+    if select_yes_no(f"Simpan hasil {result.algorithm} ke container?"):
+        container.addRes(result)
+        print(f"Hasil disimpan. Total tersimpan: {container.countRes()}")
+    else:
+        print("Hasil tidak disimpan.")
+
+
+def print_saved_results(container):
+    print()
+    print("=== Saved Results ===")
+
+    if container.countRes() == 0:
+        print("Belum ada hasil yang disimpan.")
+        return
+
+    for index, result in enumerate(container, start=1):
+        print(
+            f"{index}. {result.algorithm}, "
+            f"iterations={result.iterations}, "
+            f"final_value={result.final_value}, "
+            f"execution_time={result.execution_time:.6f} seconds"
+        )
+
+
 def main():
-    algorithm_choice = select_algorithm()
-    truck_count = select_truck_count()
-    max_iterations = select_integer(
-        "Maximum iterations",
-        DEFAULT_MAX_ITERATIONS,
-        1,
-    )
-    algorithm_parameters = select_algorithm_parameters(algorithm_choice)
-    initial_state = prepare_initial_state(
-        PACKAGE_COUNT,
-        DATASET_SEED,
-        truck_count,
-    )
+    container = ResultContainer()
 
-    print("=== Problem ===")
-    print(f"Packages: {PACKAGE_COUNT}")
-    print(f"Seed: {DATASET_SEED}")
-    print(f"Maximum iterations: {max_iterations}")
-    print(f"Trucks: {len(initial_state.trucks)}")
-    print("Objective: standard total package value")
+    while True:
+        algorithm_choice = select_algorithm()
+        hc_algorithm_name = None
 
-    for algorithm_name, parameters in algorithm_parameters.items():
-        print(f"{algorithm_name} parameters: {parameters}")
+        if algorithm_choice in ["hc", "all"]:
+            hc_algorithm_name = select_hc_algorithm()
+
+        truck_count = select_truck_count()
+        max_iterations = select_integer(
+            "Maximum iterations",
+            DEFAULT_MAX_ITERATIONS,
+            1,
+        )
+        experiment_seed = select_integer(
+            "Experiment seed",
+            DATASET_SEED,
+            0,
+        )
+        algorithm_parameters = select_algorithm_parameters(
+            algorithm_choice,
+            hc_algorithm_name,
+        )
+        problem, initial_state = prepare_initial_state(
+            PACKAGE_COUNT,
+            experiment_seed,
+            truck_count,
+        )
+
+        print("=== Problem ===")
+        print(f"Packages: {PACKAGE_COUNT}")
+        print(f"Seed: {experiment_seed}")
+        print(f"Maximum iterations: {max_iterations}")
+        print(f"Trucks: {len(problem.trucks)}")
+        print("Objective: standard total package value")
+
+        for algorithm_name, parameters in algorithm_parameters.items():
+            print(f"{algorithm_name} parameters: {parameters}")
+
+        print()
+        print("=== Initial State ===")
+        print_state(problem, initial_state)
+
+        if algorithm_choice == "all":
+            results, errors = run_all_algorithms(
+                problem,
+                initial_state,
+                max_iterations,
+                experiment_seed,
+                algorithm_parameters,
+                [
+                    hc_algorithm_name,
+                    "Simulated Annealing",
+                    "Genetic Algorithm",
+                ],
+            )
+
+            for result in results:
+                print_result(problem, result)
+                save_result(container, result)
+
+            for error in errors:
+                print()
+                print(f'=== {error["algorithm"]} ===')
+                print(f'Status: {error["error"]}')
+                print("Final state: tidak tersedia")
+        else:
+            algorithm_name = (
+                hc_algorithm_name
+                if algorithm_choice == "hc"
+                else ALGORITHM_NAMES[algorithm_choice]
+            )
+            result = run_algorithm(
+                algorithm_name,
+                problem,
+                initial_state,
+                max_iterations,
+                experiment_seed,
+                algorithm_parameters.get(algorithm_name),
+            )
+            print_result(problem, result)
+            save_result(container, result)
+
+        print_saved_results(container)
+
+        if not select_yes_no("Jalankan eksperimen lagi?"):
+            break
+
+        print()
 
     print()
-    print("=== Initial State ===")
-    print_state(initial_state)
-
-    if algorithm_choice == "all":
-        results, errors = run_all_algorithms(
-            initial_state,
-            max_iterations,
-            DATASET_SEED,
-            algorithm_parameters,
-        )
-
-        for result in results:
-            print_result(result)
-
-        for error in errors:
-            print()
-            print(f'=== {error["algorithm"]} ===')
-            print(f'Status: {error["error"]}')
-            print("Final state: tidak tersedia")
-    else:
-        algorithm_name = ALGORITHM_NAMES[algorithm_choice]
-        result = run_algorithm(
-            algorithm_name,
-            initial_state,
-            max_iterations,
-            DATASET_SEED,
-            algorithm_parameters.get(algorithm_name),
-        )
-        print_result(result)
+    print(f"Program selesai. Total hasil tersimpan: {container.countRes()}")
+    return container
 
 
 if __name__ == "__main__":

@@ -1,36 +1,24 @@
-def evaluate_obj_func(state):
+def evaluate_obj_func(problem, state):
     return sum(
-        package.value
-        for package in state.get_inside_packages()
+        problem.get_package(placement.package_id).value
+        for placement in state.get_inside_placements()
     )
 
 
-def evaluate_obj_func2(state):
-    return sum(
-        package.value
-        for package in state.get_inside_packages()
-    )
+def evaluate_obj_func2(problem, state):
+    return evaluate_obj_func(problem, state)
 
 
-def evaluate_obj_func3(state):
-    return sum(
-        package.value
-        for package in state.get_inside_packages()
-    )
+def evaluate_obj_func3(problem, state):
+    return evaluate_obj_func(problem, state)
 
 
-def evaluate_obj_func4(state):
-    return sum(
-        package.value
-        for package in state.get_inside_packages()
-    )
+def evaluate_obj_func4(problem, state):
+    return evaluate_obj_func(problem, state)
 
 
-def evaluate_obj_func5(state):
-    return sum(
-        package.value
-        for package in state.get_inside_packages()
-    )
+def evaluate_obj_func5(problem, state):
+    return evaluate_obj_func(problem, state)
 
 
 def get_objective_function(objective_number):
@@ -48,7 +36,6 @@ def get_objective_function(objective_number):
     return objective_functions[objective_number]
 
 
-def evaluate_state(state, objective_number=1):
+def evaluate_state(problem, state, objective_number=1):
     objective_function = get_objective_function(objective_number)
-    state.value = objective_function(state)
-    return state.value
+    return objective_function(problem, state)

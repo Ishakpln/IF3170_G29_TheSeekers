@@ -1,7 +1,8 @@
-from .res import Result
+from ..core import Result, evaluate_state
 
 
 def simulated_annealing(
+    problem,
     state,
     max_iterations=1000,
     seed=42,
@@ -10,12 +11,20 @@ def simulated_annealing(
     cooling_rate=0.99,
     minimum_temperature=0.01,
 ):
+    initial_state = state.copy()
+    initial_value = evaluate_state(problem, initial_state, objective_number)
+    final_state = initial_state.copy()
+
     return Result(
         "Simulated Annealing",
-        state.copy(),
-        state,
-        best_state=state,
+        initial_state,
+        final_state,
+        best_state=final_state.copy(),
+        initial_value=initial_value,
+        final_value=initial_value,
+        best_value=initial_value,
         iterations=0,
-        objective_history=[state.value],
+        objective_history=[initial_value],
         termination_reason="placeholder return",
+        problem=problem,
     )
