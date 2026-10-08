@@ -111,11 +111,22 @@ def run_algorithm(
     initial_state,
     max_iterations=1000,
     seed=42,
+    algorithm_parameters=None,
 ):
     if algorithm_name not in ALGORITHMS:
         raise ValueError(f"unknown algorithm: {algorithm_name}")
 
     algorithm = ALGORITHMS[algorithm_name]
+    parameters = dict(algorithm_parameters or {})
+    reserved_parameters = {
+        "state",
+        "max_iterations",
+        "seed",
+        "objective_number",
+    }
+
+    if reserved_parameters.intersection(parameters):
+        raise ValueError("algorithm parameters contain a reserved parameter")
 
     working_state = initial_state.copy()
     started_at = perf_counter()
@@ -124,6 +135,7 @@ def run_algorithm(
         max_iterations=max_iterations,
         seed=seed,
         objective_number=1,
+        **parameters,
     )
     execution_time = perf_counter() - started_at
 
@@ -153,6 +165,7 @@ def run_algorithm(
             "capacity": metrics["capacity"],
             "configured_max_iterations": max_iterations,
             "seed": seed,
+            "algorithm_parameters": parameters,
         }
     )
 
@@ -162,9 +175,15 @@ def run_algorithm(
     return result
 
 
-def run_all_algorithms(initial_state, max_iterations=1000, seed=42):
+def run_all_algorithms(
+    initial_state,
+    max_iterations=1000,
+    seed=42,
+    parameters_by_algorithm=None,
+):
     results = []
     errors = []
+    parameters_by_algorithm = parameters_by_algorithm or {}
 
     for algorithm_name in ALGORITHMS:
         try:
@@ -174,6 +193,7 @@ def run_all_algorithms(initial_state, max_iterations=1000, seed=42):
                     initial_state,
                     max_iterations,
                     seed,
+                    parameters_by_algorithm.get(algorithm_name),
                 )
             )
         except Exception as error:

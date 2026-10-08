@@ -1,7 +1,13 @@
 from .res import Result
 
 
-def hill_climbing(state, max_iterations=1000, seed=42, objective_number=1):
+def hill_climbing(
+    state,
+    max_iterations=1000,
+    seed=42,
+    objective_number=1,
+    max_restarts=5,
+):
     return Result(
         "Hill Climbing",
         state.copy(),

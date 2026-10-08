@@ -1,7 +1,13 @@
 from .res import Result
 
 
-def genetic_algorithm(state, max_iterations=1000, seed=42, objective_number=1):
+def genetic_algorithm(
+    state,
+    max_iterations=1000,
+    seed=42,
+    objective_number=1,
+    population_size=20,
+):
     return Result(
         "Genetic Algorithm",
         state.copy(),
