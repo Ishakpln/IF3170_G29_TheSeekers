@@ -1,3 +1,31 @@
+import pickle
+from pathlib import Path
+
+
+REQUIRED_METRICS = {
+    "Hill Climbing - Sideways Move": {
+        "configured_max_sideways",
+        "sideways_moves",
+    },
+    "Hill Climbing - Random Restart": {
+        "configured_max_restarts",
+        "completed_restarts",
+        "iterations_per_restart",
+    },
+    "Simulated Annealing": {
+        "acceptance_probability_history",
+        "current_objective_history",
+        "temperature_history",
+        "stuck_frequency",
+    },
+    "Genetic Algorithm": {
+        "population_size",
+        "maximum_fitness_history",
+        "average_fitness_history",
+    },
+}
+
+
 class Result:
     def __init__(
         self,
@@ -14,6 +42,9 @@ class Result:
         termination_reason=None,
         metrics=None,
         problem=None,
+        run_id=None,
+        run_number=None,
+        experiment_name=None,
     ):
         self.algorithm = algorithm
         self.problem = problem
@@ -30,6 +61,9 @@ class Result:
         self.execution_time = execution_time
         self.termination_reason = termination_reason
         self.metrics = metrics if metrics is not None else {}
+        self.run_id = run_id
+        self.run_number = run_number
+        self.experiment_name = experiment_name
 
 
 class ResultContainer:
@@ -39,9 +73,30 @@ class ResultContainer:
         if results is not None:
             self.addAllRes(results)
 
-    def addRes(self, result):
+    def addRes(self, result, experiment_name=None):
         if not isinstance(result, Result):
             raise TypeError("result must be a Result")
+
+        if experiment_name is not None:
+            result.experiment_name = experiment_name
+        if result.experiment_name is None:
+            result.experiment_name = result.algorithm
+        if result.run_number is None:
+            existing_run_numbers = [
+                saved.run_number
+                for saved in self.results
+                if saved.algorithm == result.algorithm
+                and saved.experiment_name == result.experiment_name
+                and saved.run_number is not None
+            ]
+            result.run_number = max(existing_run_numbers, default=0) + 1
+        if result.run_id is None:
+            existing_ids = [
+                saved.run_id
+                for saved in self.results
+                if saved.run_id is not None
+            ]
+            result.run_id = max(existing_ids, default=0) + 1
 
         self.results.append(result)
         return result
@@ -70,11 +125,37 @@ class ResultContainer:
             if result.algorithm == algorithm
         ]
 
+    def getByExperiment(self, experiment_name):
+        return [
+            result
+            for result in self.results
+            if result.experiment_name == experiment_name
+        ]
+
     def clearRes(self):
         self.results.clear()
 
     def countRes(self):
         return len(self.results)
+
+    def saveToFile(self, file_path):
+        path = Path(file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with path.open("wb") as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def loadFromFile(cls, file_path):
+        path = Path(file_path)
+
+        with path.open("rb") as file:
+            container = pickle.load(file)
+
+        if not isinstance(container, cls):
+            raise TypeError("file does not contain a ResultContainer")
+
+        return container
 
     def __len__(self):
         return len(self.results)

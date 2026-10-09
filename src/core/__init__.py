@@ -18,7 +18,7 @@ from .objective import (
     evaluate_state,
     get_objective_function,
 )
-from .res import Result, ResultContainer
+from .res import REQUIRED_METRICS, Result, ResultContainer
 from .state import Placement, State
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "Placement",
     "Position",
     "Problem",
+    "REQUIRED_METRICS",
     "Result",
     "ResultContainer",
     "State",

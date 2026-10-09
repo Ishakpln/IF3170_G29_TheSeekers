@@ -26,5 +26,11 @@ def simulated_annealing(
         iterations=0,
         objective_history=[initial_value],
         termination_reason="placeholder return",
+        metrics={
+            "acceptance_probability_history": [],
+            "current_objective_history": [initial_value],
+            "temperature_history": [initial_temperature],
+            "stuck_frequency": 0,
+        },
         problem=problem,
     )

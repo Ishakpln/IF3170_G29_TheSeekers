@@ -24,5 +24,10 @@ def genetic_algorithm(
         iterations=0,
         objective_history=[initial_value],
         termination_reason="placeholder return",
+        metrics={
+            "population_size": population_size,
+            "maximum_fitness_history": [initial_value],
+            "average_fitness_history": [initial_value],
+        },
         problem=problem,
     )

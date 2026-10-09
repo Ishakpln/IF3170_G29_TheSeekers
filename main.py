@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src.orchestration import (
     prepare_initial_state,
     run_algorithm,
@@ -22,6 +24,8 @@ HC_ALGORITHM_NAMES = {
 
 PACKAGE_COUNT = 30
 DATASET_SEED = 42
+OBJECTIVE_NUMBER = 1
+RESULT_OUTPUT_FILE = "output/results.pkl"
 DEFAULT_MAX_ITERATIONS = 1000
 DEFAULT_MAX_RESTARTS = 5
 DEFAULT_MAX_SIDEWAYS = 100
@@ -32,7 +36,7 @@ DEFAULT_POPULATION_SIZE = 20
 
 
 def print_state(problem, state):
-    metrics = state_metrics(problem, state)
+    metrics = state_metrics(problem, state, OBJECTIVE_NUMBER)
     print(f'Value: {metrics["objective"]}')
     print(f'Loaded packages: {metrics["loaded_packages"]}')
     print(f'Unloaded packages: {metrics["unloaded_packages"]}')
@@ -121,6 +125,11 @@ def select_yes_no(prompt):
             return False
 
         print("Masukkan y atau n.")
+
+
+def select_experiment_name():
+    name = input("Experiment name (optional): ").strip()
+    return name if name else None
 
 
 def select_truck_count():
@@ -248,7 +257,9 @@ def select_algorithm_parameters(algorithm_choice, hc_algorithm_name=None):
 def save_result(container, result):
     if select_yes_no(f"Simpan hasil {result.algorithm} ke container?"):
         container.addRes(result)
+        container.saveToFile(RESULT_OUTPUT_FILE)
         print(f"Hasil disimpan. Total tersimpan: {container.countRes()}")
+        print(f"File: {RESULT_OUTPUT_FILE}")
     else:
         print("Hasil tidak disimpan.")
 
@@ -263,7 +274,10 @@ def print_saved_results(container):
 
     for index, result in enumerate(container, start=1):
         print(
-            f"{index}. {result.algorithm}, "
+            f"{index}. run_id={result.run_id}, "
+            f"experiment={result.experiment_name}, "
+            f"run={result.run_number}, "
+            f"algorithm={result.algorithm}, "
             f"iterations={result.iterations}, "
             f"final_value={result.final_value}, "
             f"execution_time={result.execution_time:.6f} seconds"
@@ -271,7 +285,20 @@ def print_saved_results(container):
 
 
 def main():
-    container = ResultContainer()
+    output_path = Path(RESULT_OUTPUT_FILE)
+
+    if output_path.exists():
+        try:
+            container = ResultContainer.loadFromFile(output_path)
+            print(
+                f"Memuat {container.countRes()} hasil dari "
+                f"{RESULT_OUTPUT_FILE}."
+            )
+        except Exception as error:
+            print(f"Gagal memuat hasil sebelumnya: {error}")
+            container = ResultContainer()
+    else:
+        container = ResultContainer()
 
     while True:
         algorithm_choice = select_algorithm()
@@ -291,6 +318,7 @@ def main():
             DATASET_SEED,
             0,
         )
+        experiment_name = select_experiment_name()
         algorithm_parameters = select_algorithm_parameters(
             algorithm_choice,
             hc_algorithm_name,
@@ -304,9 +332,13 @@ def main():
         print("=== Problem ===")
         print(f"Packages: {PACKAGE_COUNT}")
         print(f"Seed: {experiment_seed}")
+        print(
+            "Experiment: "
+            + (experiment_name if experiment_name else "default")
+        )
         print(f"Maximum iterations: {max_iterations}")
         print(f"Trucks: {len(problem.trucks)}")
-        print("Objective: standard total package value")
+        print(f"Objective number: {OBJECTIVE_NUMBER}")
 
         for algorithm_name, parameters in algorithm_parameters.items():
             print(f"{algorithm_name} parameters: {parameters}")
@@ -327,6 +359,8 @@ def main():
                     "Simulated Annealing",
                     "Genetic Algorithm",
                 ],
+                OBJECTIVE_NUMBER,
+                experiment_name,
             )
 
             for result in results:
@@ -351,6 +385,8 @@ def main():
                 max_iterations,
                 experiment_seed,
                 algorithm_parameters.get(algorithm_name),
+                OBJECTIVE_NUMBER,
+                experiment_name,
             )
             print_result(problem, result)
             save_result(container, result)
