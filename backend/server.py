@@ -13,8 +13,11 @@ from src.core import ResultContainer
 from src.orchestration import ALGORITHMS, prepare_initial_state, run_algorithm, state_rows
 
 
-RESULTS_FILE = Path(os.environ.get("IF3170_RESULTS_FILE", "output/results.pkl"))
-FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+RESULTS_FILE = Path(
+    os.environ.get("IF3170_RESULTS_FILE", str(PROJECT_ROOT / "output" / "results.pkl"))
+)
+FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 MAX_WORKERS = max(2, min(8, os.cpu_count() or 4))
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIST), static_url_path="")
