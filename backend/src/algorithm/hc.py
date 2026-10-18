@@ -46,7 +46,7 @@ def hill_climbing_steepest_ascent(
     final_state = cur_state.copy()
 
     return Result(
-        "Hill Climbing Steepest Ascent",
+        "Hill Climbing - Steepest Ascent",
         initial_state,
         final_state,
         best_state=final_state.copy(),
@@ -119,7 +119,7 @@ def hill_climbing_stochastic(
     final_state = cur_state.copy()
 
     return Result(
-        "Stochastic Hill Climbing",
+        "Hill Climbing - Stochastic",
         initial_state,
         final_state,
         best_state=final_state.copy(),
@@ -195,7 +195,7 @@ def hill_climbing_sideways_move(
     final_state = cur_state.copy()
 
     return Result(
-        "Hill Climbing with Sideways Move",
+        "Hill Climbing - Sideways Move",
         initial_state,
         final_state,
         best_state=final_state.copy(),
@@ -222,25 +222,61 @@ def hill_climbing_random_restart(
     objective_number=1,
     max_restarts=5,
 ):
-    initial_state = state.copy()
-    initial_value = evaluate_state(problem, initial_state, objective_number)
-    final_state = initial_state.copy()
+    from random import Random
+    from time import perf_counter
+
+    if not isinstance(max_iterations, int) or max_iterations < 0:
+        raise ValueError("max_iteration tidak valid")
+    if not isinstance(max_restarts, int) or max_restarts < 0:
+        raise ValueError("max_restarts tidak valid")
+
+    started_at = perf_counter()
+    rng = Random(seed)
+    best_result = None
+    initial_state = None
+    objective_history = []
+    iterations_per_restart = []
+
+    for _ in range(max_restarts + 1):
+        random_state = generate_initial_state(problem, seed=seed, rng=rng)
+        result = hill_climbing_steepest_ascent(
+            problem,
+            random_state,
+            max_iterations=max_iterations,
+            seed=seed,
+            objective_number=objective_number,
+        )
+
+        if initial_state is None:
+            initial_state = result.initial_state.copy()
+        if best_result is None or result.best_value > best_result.best_value:
+            best_result = result
+
+        iterations_per_restart.append(result.iterations)
+        for value in result.objective_history:
+            objective_history.append(
+                max(objective_history[-1], value) if objective_history else value
+            )
+
+    final_state = best_result.best_state.copy()
 
     return Result(
-        "Random-Restart Hill Climbing",
+        "Hill Climbing - Random Restart",
         initial_state,
         final_state,
         best_state=final_state.copy(),
-        initial_value=initial_value,
-        final_value=initial_value,
-        best_value=initial_value,
-        iterations=0,
-        objective_history=[initial_value],
-        termination_reason="initial state returned",
+        initial_value=objective_history[0],
+        final_value=best_result.best_value,
+        best_value=best_result.best_value,
+        iterations=len(objective_history) - 1,
+        objective_history=objective_history,
+        execution_time=perf_counter() - started_at,
+        termination_reason="telah mencapai restart maksimum",
         metrics={
             "configured_max_restarts": max_restarts,
-            "completed_restarts": 0,
-            "iterations_per_restart": [],
+            "completed_restarts": len(iterations_per_restart) - 1,
+            "iterations_per_restart": iterations_per_restart,
+            "total_search_iterations": sum(iterations_per_restart),
         },
         problem=problem,
     )

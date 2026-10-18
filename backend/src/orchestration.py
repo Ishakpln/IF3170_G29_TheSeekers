@@ -163,9 +163,12 @@ def _validate_result_contract(result):
             raise RuntimeError(
                 "iterations_per_restart must contain non-negative integers"
             )
-        if sum(restart_iterations) != result.iterations:
+        if (
+            sum(restart_iterations) + result.metrics["completed_restarts"]
+            != result.iterations
+        ):
             raise RuntimeError(
-                "iterations_per_restart must sum to iterations"
+                "iterations must include search iterations and restart transitions"
             )
         if (
             result.metrics["completed_restarts"]
@@ -250,7 +253,8 @@ def run_algorithm(
 ):
     if algorithm_name not in ALGORITHMS:
         raise ValueError(f"unknown algorithm: {algorithm_name}")
-    if not is_valid_state(problem, initial_state):
+    is_random_restart = algorithm_name == "Hill Climbing - Random Restart"
+    if not is_random_restart and not is_valid_state(problem, initial_state):
         raise ValueError("initial state is invalid")
 
     algorithm = ALGORITHMS[algorithm_name]
@@ -266,7 +270,7 @@ def run_algorithm(
     if reserved_parameters.intersection(parameters):
         raise ValueError("algorithm parameters contain a reserved parameter")
 
-    working_state = initial_state.copy()
+    working_state = None if is_random_restart else initial_state.copy()
     started_at = perf_counter()
     result = algorithm(
         problem,
@@ -289,7 +293,9 @@ def run_algorithm(
     if not is_valid_state(problem, result.best_state):
         raise RuntimeError(f"{algorithm_name} mengembalikan best state tidak valid")
 
-    initial_snapshot = initial_state.copy()
+    initial_snapshot = (
+        result.initial_state.copy() if is_random_restart else initial_state.copy()
+    )
     initial_value = evaluate_state(problem, initial_snapshot, objective_number)
     final_value = evaluate_state(problem, result.final_state, objective_number)
     best_value = evaluate_state(problem, result.best_state, objective_number)

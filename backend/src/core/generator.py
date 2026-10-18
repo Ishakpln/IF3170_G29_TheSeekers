@@ -215,11 +215,14 @@ def generate_initial_state(
     seed=None,
     placement_probability=0.7,
     max_attempts=100,
+    *,
+    rng=None,
 ):
     if not problem.trucks:
         raise ValueError("at least one truck is required")
 
-    rng = random.Random(seed)
+    if rng is None:
+        rng = random.Random(seed)
     placements = [
         Placement(
             package.id,
