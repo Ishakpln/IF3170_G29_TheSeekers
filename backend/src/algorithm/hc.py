@@ -8,48 +8,55 @@ def hill_climbing_steepest_ascent(
     seed=42,
     objective_number=1,
 ):
+    from time import perf_counter
+
+    if not isinstance(max_iterations, int) or max_iterations < 0:
+        raise ValueError("max_iteration tidak valid")
+    if not is_valid_state(problem, state):
+        raise ValueError("initital state tidak valid")
+
+    started_at = perf_counter()
     initial_state = state.copy()
     initial_value = evaluate_state(problem, initial_state, objective_number)
-
-
     cur_state = initial_state.copy()
     cur_value = initial_value
-    # algo 
-    cont = 1
-    tempState = cur_state
-    max = cur_value 
-    i = 0
-    while (cont == 1 and i < 1000 ) :
-        i += 1
-        found = 0
-        for neighbor in generate_all_neighbors(problem, cur_state) : 
-            neighborVal = evaluate_state(problem, neighbor, objective_number)
-            if (neighborVal > max) : 
-                max = neighborVal
-                tempState = neighbor
-                found = 1
+    iterations = 0
+    objective_history = [initial_value]
+    termination_reason = "telah mencapai iterasi maksimum"
 
-        if (found == 1) : 
-            cur_state = tempState 
-        elif (found == 0) : 
-            cur_state = tempState
-            cont = 0
+    while iterations < max_iterations:
+        best_neighbor = None    
+        best_neighbor_value = cur_value
 
+        for neighbor in generate_all_neighbors(problem, cur_state):
+            neighbor_value = evaluate_state(problem, neighbor, objective_number)
+            if neighbor_value > best_neighbor_value:
+                best_neighbor = neighbor
+                best_neighbor_value = neighbor_value
 
-    # ini buat kumpul
+        if best_neighbor is None:
+            termination_reason = "tidak ada neighbor yang valuenya lebih tinggi"
+            break
+
+        cur_state = best_neighbor
+        cur_value = best_neighbor_value
+        iterations += 1
+        objective_history.append(cur_value)
+
     final_state = cur_state.copy()
 
     return Result(
-        "Steepest-Ascent Hill Climbing",
+        "Hill Climbing Steepest Ascent",
         initial_state,
         final_state,
         best_state=final_state.copy(),
         initial_value=initial_value,
         final_value=cur_value,
         best_value=cur_value,
-        iterations=0,
-        objective_history=[initial_value],
-        termination_reason="initial state returned",
+        iterations=iterations,
+        objective_history=objective_history,
+        execution_time=perf_counter() - started_at,
+        termination_reason=termination_reason,
         problem=problem,
     )
 
