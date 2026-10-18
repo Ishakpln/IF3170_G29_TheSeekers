@@ -24,7 +24,7 @@ ALGORITHMS = {
 }
 
 
-def generate_problem(package_count=30, seed=42, truck_count=1):
+def generate_problem(package_count=30, seed=None, truck_count=1):
     if truck_count < 1:
         raise ValueError("truck_count must be at least 1")
 
@@ -54,7 +54,7 @@ def generate_problem(package_count=30, seed=42, truck_count=1):
     return Problem(trucks, packages)
 
 
-def prepare_initial_state(package_count=30, seed=42, truck_count=1):
+def prepare_initial_state(package_count=30, seed=None, truck_count=1):
     problem = generate_problem(package_count, seed, truck_count)
     state = generate_initial_state(problem, seed=seed)
 
@@ -243,7 +243,7 @@ def run_algorithm(
     problem,
     initial_state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     algorithm_parameters=None,
     objective_number=1,
     experiment_name=None,
@@ -328,7 +328,7 @@ def run_all_algorithms(
     problem,
     initial_state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     parameters_by_algorithm=None,
     algorithm_names=None,
     objective_number=1,

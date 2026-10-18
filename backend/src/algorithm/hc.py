@@ -5,7 +5,7 @@ def hill_climbing_steepest_ascent(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
 ):
     from time import perf_counter
@@ -65,7 +65,7 @@ def hill_climbing_stochastic(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
 ):
     initial_state = state.copy()
@@ -91,7 +91,7 @@ def hill_climbing_sideways_move(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
     max_sideways=100,
 ):
@@ -122,7 +122,7 @@ def hill_climbing_random_restart(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
     max_restarts=5,
 ):
@@ -155,7 +155,7 @@ def hill_climbing(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
     max_restarts=5,
 ):

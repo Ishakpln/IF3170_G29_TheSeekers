@@ -5,7 +5,7 @@ def simulated_annealing(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
     initial_temperature=100.0,
     cooling_rate=0.99,

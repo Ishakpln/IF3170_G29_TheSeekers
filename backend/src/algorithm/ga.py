@@ -5,7 +5,7 @@ def genetic_algorithm(
     problem,
     state,
     max_iterations=1000,
-    seed=42,
+    seed=None,
     objective_number=1,
     population_size=20,
 ):
