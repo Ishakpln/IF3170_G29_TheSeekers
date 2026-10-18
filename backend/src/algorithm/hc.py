@@ -1,4 +1,4 @@
-from ..core import Result, evaluate_state
+from ..core import *
 
 
 def hill_climbing_steepest_ascent(
@@ -10,7 +10,34 @@ def hill_climbing_steepest_ascent(
 ):
     initial_state = state.copy()
     initial_value = evaluate_state(problem, initial_state, objective_number)
-    final_state = initial_state.copy()
+
+
+    cur_state = initial_state.copy()
+    cur_value = initial_value
+    # algo 
+    cont = 1
+    tempState = cur_state
+    max = cur_value 
+    i = 0
+    while (cont == 1 and i < 1000 ) :
+        i += 1
+        found = 0
+        for neighbor in generate_all_neighbors(problem, cur_state) : 
+            neighborVal = evaluate_state(problem, neighbor, objective_number)
+            if (neighborVal > max) : 
+                max = neighborVal
+                tempState = neighbor
+                found = 1
+
+        if (found == 1) : 
+            cur_state = tempState 
+        elif (found == 0) : 
+            cur_state = tempState
+            cont = 0
+
+
+    # ini buat kumpul
+    final_state = cur_state.copy()
 
     return Result(
         "Steepest-Ascent Hill Climbing",
@@ -18,8 +45,8 @@ def hill_climbing_steepest_ascent(
         final_state,
         best_state=final_state.copy(),
         initial_value=initial_value,
-        final_value=initial_value,
-        best_value=initial_value,
+        final_value=cur_value,
+        best_value=cur_value,
         iterations=0,
         objective_history=[initial_value],
         termination_reason="initial state returned",
