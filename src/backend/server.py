@@ -1,10 +1,10 @@
 import atexit
 import json
 import os
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from threading import Lock
+from threading import Event, Lock
 from uuid import uuid4
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -97,6 +97,7 @@ def normalize_saved_results():
             "completed_at": now_iso(),
             "result": result,
             "error": None,
+            "cancel_event": Event(),
         }
 
 
@@ -209,13 +210,20 @@ def run_experiment_job(job_id):
             return
 
         config = dict(job["config"])
+        cancel_event = job["cancel_event"]
 
     try:
+        if cancel_event.is_set():
+            raise CancelledError()
+
         problem, initial_state = prepare_initial_state(
             config["package_count"],
             config["seed"],
             config["truck_count"],
         )
+        if cancel_event.is_set():
+            raise CancelledError()
+
         result = run_algorithm(
             config["algorithm"],
             problem,
@@ -225,19 +233,29 @@ def run_experiment_job(job_id):
             algorithm_parameters=config["algorithm_parameters"],
             objective_number=config["objective_number"],
             experiment_name=config["experiment_name"],
+            cancel_event=cancel_event,
         )
+
+        if cancel_event.is_set():
+            raise CancelledError()
 
         with jobs_lock:
             if job_id in jobs:
                 jobs[job_id]["status"] = "completed"
                 jobs[job_id]["completed_at"] = now_iso()
                 jobs[job_id]["result"] = result
+    except CancelledError:
+        # Deleting a running job removes it from `jobs`; no result is retained.
+        return
     except Exception as error:
         with jobs_lock:
             if job_id in jobs:
                 jobs[job_id]["status"] = "failed"
                 jobs[job_id]["completed_at"] = now_iso()
                 jobs[job_id]["error"] = str(error)
+    finally:
+        with jobs_lock:
+            futures.pop(job_id, None)
 
 
 def serialize_job(job, include_details=False):
@@ -339,6 +357,7 @@ def create_experiment():
         "completed_at": None,
         "result": None,
         "error": None,
+        "cancel_event": Event(),
     }
 
     with jobs_lock:
@@ -384,15 +403,17 @@ def delete_experiment(job_id):
 
         if job is None:
             return jsonify({"error": "experiment not found"}), 404
-        if job["status"] == "pending":
-            return jsonify({"error": "a pending experiment cannot be deleted"}), 409
+
+        job["cancel_event"].set()
+        future = futures.pop(job_id, None)
+        if future is not None:
+            future.cancel()
 
         if job["saved"]:
             result_container.removeRes(job["result"])
             save_container()
 
         jobs.pop(job_id, None)
-        futures.pop(job_id, None)
 
     return "", 204
 

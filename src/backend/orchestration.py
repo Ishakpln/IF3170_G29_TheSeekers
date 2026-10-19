@@ -1,4 +1,5 @@
 import random
+from concurrent.futures import CancelledError
 from itertools import accumulate
 from time import perf_counter
 
@@ -282,7 +283,11 @@ def run_algorithm(
     algorithm_parameters=None,
     objective_number=1,
     experiment_name=None,
+    cancel_event=None,
 ):
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError()
+
     if algorithm_name not in ALGORITHMS:
         raise ValueError(f"unknown algorithm: {algorithm_name}")
     is_random_restart = algorithm_name == "Hill Climbing - Random Restart"
@@ -297,6 +302,7 @@ def run_algorithm(
         "max_iterations",
         "seed",
         "objective_number",
+        "cancel_event",
     }
 
     if reserved_parameters.intersection(parameters):
@@ -310,9 +316,13 @@ def run_algorithm(
         max_iterations=max_iterations,
         seed=seed,
         objective_number=objective_number,
+        cancel_event=cancel_event,
         **parameters,
     )
     execution_time = perf_counter() - started_at
+
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError()
 
     if not isinstance(result, Result):
         raise RuntimeError(f"{algorithm_name} tidak mengembalikan Result")
@@ -371,6 +381,7 @@ def run_all_algorithms(
     algorithm_names=None,
     objective_number=1,
     experiment_name=None,
+    cancel_event=None,
 ):
     results = []
     errors = []
@@ -393,8 +404,11 @@ def run_all_algorithms(
                     parameters_by_algorithm.get(algorithm_name),
                     objective_number,
                     experiment_name,
+                    cancel_event,
                 )
             )
+        except CancelledError:
+            raise
         except Exception as error:
             errors.append(
                 {

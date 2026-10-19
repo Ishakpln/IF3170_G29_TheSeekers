@@ -249,6 +249,110 @@ function NumberField({ label, ...props }) {
 }
 
 
+const PARAMETER_LABELS = {
+  max_sideways: "Maximum sideways moves",
+  max_restarts: "Maximum restarts",
+  initial_temperature: "Initial temperature",
+  cooling_rate: "Cooling rate",
+  minimum_temperature: "Minimum temperature",
+  population_size: "Population size",
+};
+
+const TERMINATION_COPY = {
+  "maximum iterations reached": "The search stopped after reaching the configured iteration limit.",
+  "minimum temperature reached": "The search stopped after cooling to the configured minimum temperature.",
+  "failed to generate a valid neighbor": "The search stopped because no valid neighboring state could be generated.",
+  "telah mencapai iterasi maksimum": "The search stopped after reaching the configured iteration limit.",
+  "telah mencapai restart maksimum": "The search completed all configured restart attempts.",
+  "telah mencapai sideways move maksimum": "The search stopped after reaching the sideways-move limit.",
+  "tidak ada neighbor yang valuenya lebih tinggi": "The search stopped because no better neighboring state was available.",
+  "tidak ada neighbor yang valuenya lebih tinggi atau sama": "The search stopped because no equal or better neighboring state was available.",
+};
+
+function parameterValue(name, value) {
+  if (name === "cooling_rate" && Number.isFinite(Number(value))) {
+    return `${formatObjective(Number(value) * 100)}% retained per iteration`;
+  }
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return formatObjective(value);
+  return String(value);
+}
+
+function OverviewPanel({ experiment }) {
+  const objective = selectedObjective(experiment);
+  const parameters = Object.entries(experiment.algorithm_parameters || {});
+  const improvement =
+    experiment.best_value == null || experiment.initial_value == null
+      ? null
+      : experiment.best_value - experiment.initial_value;
+  const termination = TERMINATION_COPY[experiment.termination_reason]
+    || experiment.termination_reason
+    || "No termination reason was recorded for this run.";
+
+  return (
+    <div className="overview-panel">
+      <section className="overview-hero">
+        <div className="overview-hero-copy">
+          <div className="overview-kickers">
+            <span className={`overview-status ${experiment.status}`}>{experiment.status}</span>
+            <span>{experiment.saved ? "Saved result" : "Temporary result"}</span>
+          </div>
+          <h3>{experiment.experiment_name || "Untitled experiment"}</h3>
+          <p>{termination}</p>
+        </div>
+        <div className={`overview-improvement ${improvement >= 0 ? "positive" : "negative"}`}>
+          <span>Best improvement</span>
+          <strong>{improvement == null ? "—" : `${improvement >= 0 ? "+" : ""}${formatObjective(improvement)}`}</strong>
+          <small>compared with the initial state</small>
+        </div>
+      </section>
+
+      <div className="overview-grid">
+        <section className="overview-card">
+          <header><span>SEARCH</span><h4>Run progress</h4></header>
+          <dl>
+            <div><dt>Iterations completed</dt><dd>{formatObjective(experiment.iterations)}</dd></div>
+            <div><dt>Configured limit</dt><dd>{formatObjective(experiment.max_iterations)}</dd></div>
+            <div><dt>Random seed</dt><dd>{experiment.seed ?? "—"}</dd></div>
+          </dl>
+        </section>
+
+        <section className="overview-card">
+          <header><span>OBJECTIVE</span><h4>{objective.label}</h4></header>
+          <p>{objective.description}</p>
+          <div className="overview-objective-id">Objective function {objective.id}</div>
+        </section>
+
+        <section className="overview-card">
+          <header><span>PROBLEM</span><h4>Search space</h4></header>
+          <dl>
+            <div><dt>Packages</dt><dd>{formatObjective(experiment.package_count)}</dd></div>
+            <div><dt>Containers</dt><dd>{formatObjective(experiment.truck_count)}</dd></div>
+            <div><dt>Algorithm</dt><dd>{LABELS[experiment.algorithm] || experiment.algorithm}</dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <section className="overview-parameters">
+        <header><span>CONFIGURATION</span><h4>Algorithm parameters</h4></header>
+        {parameters.length ? (
+          <div className="parameter-grid">
+            {parameters.map(([name, value]) => (
+              <div key={name}>
+                <span>{PARAMETER_LABELS[name] || name.replaceAll("_", " ")}</span>
+                <strong>{parameterValue(name, value)}</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="overview-empty-parameters">This algorithm has no additional run parameters.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+
 function DetailsModal({ experiment, onClose }) {
   const [tab, setTab] = useState("overview");
   const [stateView, setStateView] = useState("3d");
@@ -273,16 +377,8 @@ function DetailsModal({ experiment, onClose }) {
             </button>
           ))}
         </nav>
-        <div className="detail-content">
-          {tab === "overview" && <pre>{JSON.stringify({
-            status: experiment.status,
-            saved: experiment.saved,
-            iterations: experiment.iterations,
-            objective_number: selectedObjective(experiment).id,
-            objective_function: selectedObjective(experiment).label,
-            termination_reason: experiment.termination_reason,
-            parameters: experiment.algorithm_parameters,
-          }, null, 2)}</pre>}
+        <div className={`detail-content ${tab === "overview" ? "overview-content" : ""}`}>
+          {tab === "overview" && <OverviewPanel experiment={experiment} />}
           {tab === "metrics" && <pre>{JSON.stringify(experiment.metrics || {}, null, 2)}</pre>}
           {tab === "plots" && <ExperimentPlots experiment={experiment} />}
           {["initial_state", "final_state", "best_state"].includes(tab) && (
@@ -408,11 +504,22 @@ export default function App() {
   }
 
   async function deleteExperiment(id) {
-    if (!window.confirm("Delete this experiment result?")) return;
+    const experiment = experiments.find((item) => item.id === id);
+    const message = experiment?.status === "pending"
+      ? "Cancel and delete this running experiment?"
+      : "Delete this experiment result?";
+
+    if (!window.confirm(message)) return;
 
     try {
       await api(`/api/experiments/${id}`, { method: "DELETE" });
-      await refresh();
+      setExperiments((current) => current.filter((item) => item.id !== id));
+      setSelected((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+      setContextMenu(null);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -526,10 +633,9 @@ export default function App() {
             <hr />
             <button
               className="danger"
-              disabled={experiment.status === "pending"}
               onClick={() => deleteExperiment(experiment.id)}
             >
-              Delete result
+              {experiment.status === "pending" ? "Cancel and delete" : "Delete result"}
             </button>
           </div>
         );

@@ -1,3 +1,4 @@
+from concurrent.futures import CancelledError
 import random
 from time import perf_counter
 
@@ -17,6 +18,11 @@ from ..core import (
 
 MIN_MUTATION_RATE = 0.01
 MAX_MUTATION_RATE = 0.05
+
+
+def _raise_if_cancelled(cancel_event):
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError()
 
 
 def _select_parent(population, fitness, tot_fitness, rng):
@@ -183,6 +189,7 @@ def genetic_algorithm(
     seed=None,
     objective_number=1,
     population_size=20,
+    cancel_event=None,
 ):
     MAX_INVALID_CHILD = population_size * 10
     if (not isinstance(max_iterations, int) or max_iterations < 0 ):
@@ -196,10 +203,12 @@ def genetic_algorithm(
     rng = random.Random(seed)
     population = [state.copy()]
     while len(population) < population_size:
+        _raise_if_cancelled(cancel_event)
         population.append(generate_initial_state(problem, rng=rng))
 
     fitness = []
     for individual in population:
+        _raise_if_cancelled(cancel_event)
         temp = evaluate_state(problem, individual, objective_number)
         fitness.append(temp)
 
@@ -223,15 +232,18 @@ def genetic_algorithm(
     iterations = 0
 
     while iterations < max_iterations:
+        _raise_if_cancelled(cancel_event)
         next_population = []
         invalid_child = 0
 
         while len(next_population) < population_size:
+            _raise_if_cancelled(cancel_event)
             first_parent = _select_parent(population, fitness, tot_fitness, rng)
             second_parent = _select_parent(population, fitness, tot_fitness, rng)
             first_child, second_child = _crossover(problem, first_parent, second_parent, rng)
 
             for child in (first_child, second_child):
+                _raise_if_cancelled(cancel_event)
                 if not is_valid_state(problem, child):
                     invalid_child += 1
 
@@ -255,6 +267,7 @@ def genetic_algorithm(
         population = next_population
         fitness = []
         for individual in population:
+            _raise_if_cancelled(cancel_event)
             temp = evaluate_state(problem, individual, objective_number)
             fitness.append(temp)
 

@@ -1,3 +1,4 @@
+from concurrent.futures import CancelledError
 from math import exp, isfinite
 from random import Random
 from time import perf_counter
@@ -11,6 +12,11 @@ from ..core import (
     is_valid_state,
     swap,
 )
+
+
+def _raise_if_cancelled(cancel_event):
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError()
 
 
 def _oriented_dimensions(problem, placement):
@@ -120,11 +126,12 @@ def _can_add_to_truck(
     return True
 
 
-def _has_value_improving_neighbor(problem, state):
+def _has_value_improving_neighbor(problem, state, cancel_event=None):
     inside = state.get_inside_placements()
     outside = state.get_outside_placements()
 
     for outside_placement in outside:
+        _raise_if_cancelled(cancel_event)
         outside_value = problem.get_package(outside_placement.package_id).value
 
         for inside_placement in inside:
@@ -153,6 +160,7 @@ def _has_value_improving_neighbor(problem, state):
     }
 
     for placement in outside:
+        _raise_if_cancelled(cancel_event)
         package = problem.get_package(placement.package_id)
 
         if package.value <= 0:
@@ -182,6 +190,7 @@ def _has_value_improving_neighbor(problem, state):
                     possible_z.add(top)
 
             for x in range(truck.dimensions.width - size.width + 1):
+                _raise_if_cancelled(cancel_event)
                 for y in range(truck.dimensions.length - size.length + 1):
                     for z in possible_z:
                         if _can_add_to_truck(
@@ -197,12 +206,19 @@ def _has_value_improving_neighbor(problem, state):
     return False
 
 
-def _is_local_optimum(problem, state, current_value, objective_number):
+def _is_local_optimum(
+    problem,
+    state,
+    current_value,
+    objective_number,
+    cancel_event=None,
+):
     """Return whether no valid one-step neighbor has a higher objective."""
     if objective_number == 1:
-        return not _has_value_improving_neighbor(problem, state)
+        return not _has_value_improving_neighbor(problem, state, cancel_event)
 
     for neighbor in generate_all_neighbors(problem, state):
+        _raise_if_cancelled(cancel_event)
         neighbor_value = evaluate_state(problem, neighbor, objective_number)
 
         if neighbor_value > current_value:
@@ -220,6 +236,7 @@ def simulated_annealing(
     initial_temperature=100.0,
     cooling_rate=0.99,
     minimum_temperature=0.01,
+    cancel_event=None,
 ):
     if not isinstance(max_iterations, int) or isinstance(max_iterations, bool):
         raise ValueError("max_iterations must be an integer")
@@ -274,6 +291,7 @@ def simulated_annealing(
     termination_reason = "maximum iterations reached"
 
     while iterations < max_iterations and temperature > minimum_temperature:
+        _raise_if_cancelled(cancel_event)
         try:
             neighbor = generate_random_neighbor(
                 problem,
@@ -327,6 +345,7 @@ def simulated_annealing(
         final_state,
         current_value,
         objective_number,
+        cancel_event,
     )
 
     # This is a per-run indicator. Its mean across repeated SA runs is the

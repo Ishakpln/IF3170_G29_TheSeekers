@@ -1,4 +1,11 @@
+from concurrent.futures import CancelledError
+
 from ..core import *
+
+
+def _raise_if_cancelled(cancel_event):
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError()
 
 
 def hill_climbing_steepest_ascent(
@@ -7,6 +14,7 @@ def hill_climbing_steepest_ascent(
     max_iterations=1000,
     seed=None,
     objective_number=1,
+    cancel_event=None,
 ):
     from time import perf_counter
 
@@ -25,10 +33,12 @@ def hill_climbing_steepest_ascent(
     termination_reason = "telah mencapai iterasi maksimum"
 
     while iterations < max_iterations:
+        _raise_if_cancelled(cancel_event)
         best_neighbor = None    
         best_neighbor_value = cur_value
 
         for neighbor in generate_all_neighbors(problem, cur_state):
+            _raise_if_cancelled(cancel_event)
             neighbor_value = evaluate_state(problem, neighbor, objective_number)
             if neighbor_value > best_neighbor_value:
                 best_neighbor = neighbor
@@ -67,6 +77,7 @@ def hill_climbing_stochastic(
     max_iterations=1000,
     seed=None,
     objective_number=1,
+    cancel_event=None,
 ):
     from random import Random
     from time import perf_counter
@@ -87,6 +98,7 @@ def hill_climbing_stochastic(
     rng = Random(seed)
 
     while iterations < max_iterations:
+        _raise_if_cancelled(cancel_event)
         try:
             neighbor = generate_random_neighbor(problem, cur_state, seed=seed, rng=rng)
         except RuntimeError:
@@ -126,6 +138,7 @@ def hill_climbing_sideways_move(
     seed=None,
     objective_number=1,
     max_sideways=100,
+    cancel_event=None,
 ):
     from time import perf_counter
 
@@ -147,10 +160,12 @@ def hill_climbing_sideways_move(
     termination_reason = "telah mencapai iterasi maksimum"
 
     while iterations < max_iterations:
+        _raise_if_cancelled(cancel_event)
         best_neighbor = None
         best_neighbor_value = cur_value
 
         for neighbor in generate_all_neighbors(problem, cur_state):
+            _raise_if_cancelled(cancel_event)
             neighbor_value = evaluate_state(problem, neighbor, objective_number)
             if neighbor_value >= best_neighbor_value:
                 best_neighbor = neighbor
@@ -205,6 +220,7 @@ def hill_climbing_random_restart(
     seed=None,
     objective_number=1,
     max_restarts=5,
+    cancel_event=None,
 ):
     from random import Random
     from time import perf_counter
@@ -224,13 +240,16 @@ def hill_climbing_random_restart(
     total_search_iterations = 0
 
     for _ in range(max_restarts + 1):
+        _raise_if_cancelled(cancel_event)
         random_state = generate_initial_state(problem, seed=seed, rng=rng)
+        _raise_if_cancelled(cancel_event)
         result = hill_climbing_steepest_ascent(
             problem,
             random_state,
             max_iterations=max_iterations,
             seed=seed,
             objective_number=objective_number,
+            cancel_event=cancel_event,
         )
 
         if initial_state is None:
@@ -279,6 +298,7 @@ def hill_climbing(
     seed=None,
     objective_number=1,
     max_restarts=5,
+    cancel_event=None,
 ):
     return hill_climbing_random_restart(
         problem,
@@ -287,4 +307,5 @@ def hill_climbing(
         seed,
         objective_number,
         max_restarts,
+        cancel_event,
     )
