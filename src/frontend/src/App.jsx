@@ -223,7 +223,7 @@ function ExperimentForm({ onClose, onCreated }) {
           {form.algorithm === "Simulated Annealing" && (
             <>
               <NumberField label="Initial temperature" name="initial_temperature" value={form.initial_temperature} min="0.01" step="0.01" onChange={update} />
-              <NumberField label="Cooling rate" name="cooling_rate" value={form.cooling_rate} min="0.001" max="1" step="0.001" onChange={update} />
+              <NumberField label="Cooling rate" name="cooling_rate" value={form.cooling_rate} min="0.001" max="0.999" step="0.001" onChange={update} />
               <NumberField label="Minimum temperature" name="minimum_temperature" value={form.minimum_temperature} min="0.001" step="0.001" onChange={update} />
             </>
           )}
