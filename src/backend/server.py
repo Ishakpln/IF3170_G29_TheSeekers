@@ -276,6 +276,16 @@ def serialize_job(job, include_details=False):
     if include_details:
         data.update(
             {
+                "trucks": [
+                    {
+                        "id": truck.id,
+                        "width": truck.dimensions.width,
+                        "length": truck.dimensions.length,
+                        "height": truck.dimensions.height,
+                        "max_capacity": truck.max_capacity,
+                    }
+                    for truck in result.problem.trucks
+                ],
                 "initial_state": state_rows(result.problem, result.initial_state),
                 "final_state": state_rows(result.problem, result.final_state),
                 "best_state": state_rows(result.problem, result.best_state),

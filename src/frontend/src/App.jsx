@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+
+const StateVisualization = lazy(() => import("./visualization/StateVisualization.jsx"));
 
 
 const ALGORITHMS = [
@@ -294,10 +296,11 @@ function NumberField({ label, ...props }) {
 
 function DetailsModal({ experiment, onClose }) {
   const [tab, setTab] = useState("overview");
+  const [stateView, setStateView] = useState("3d");
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <section className="modal details-modal" onMouseDown={(event) => event.stopPropagation()}>
+      <section className="modal details-modal" role="dialog" aria-modal="true" aria-label="Experiment details" onMouseDown={(event) => event.stopPropagation()}>
         <header className="modal-header">
           <div><span>RUN DETAILS</span><h2>{experiment.algorithm}</h2></div>
           <button onClick={onClose}>×</button>
@@ -325,7 +328,22 @@ function DetailsModal({ experiment, onClose }) {
           }, null, 2)}</pre>}
           {tab === "metrics" && <pre>{JSON.stringify(experiment.metrics || {}, null, 2)}</pre>}
           {["initial_state", "final_state", "best_state"].includes(tab) && (
-            <StateTable rows={experiment[tab] || []} />
+            <>
+              <div className="state-view-switch" role="group" aria-label="State display mode">
+                <button type="button" aria-pressed={stateView === "3d"} onClick={() => setStateView("3d")}>3D view</button>
+                <button type="button" aria-pressed={stateView === "table"} onClick={() => setStateView("table")}>Table view</button>
+              </div>
+              {stateView === "3d" ? (
+                <Suspense fallback={<div className="viz-loading">Loading 3D viewer…</div>}>
+                  <StateVisualization
+                    rows={experiment[tab] || []}
+                    trucks={experiment.trucks || []}
+                    value={experiment[{ initial_state: "initial_value", final_state: "final_value", best_state: "best_value" }[tab]]}
+                    stateLabel={tab.replace("_", " ")}
+                  />
+                </Suspense>
+              ) : <StateTable rows={experiment[tab] || []} />}
+            </>
           )}
         </div>
       </section>
