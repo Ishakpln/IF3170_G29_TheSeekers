@@ -11,10 +11,13 @@ REQUIRED_METRICS = {
         "configured_max_restarts",
         "completed_restarts",
         "iterations_per_restart",
+        "total_search_iterations",
+        "objective_history_iterations",
     },
     "Simulated Annealing": {
         "acceptance_probability_history",
         "current_objective_history",
+        "best_objective_history",
         "temperature_history",
         "stuck_frequency",
     },

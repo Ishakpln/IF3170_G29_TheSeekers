@@ -219,7 +219,9 @@ def hill_climbing_random_restart(
     best_result = None
     initial_state = None
     objective_history = []
+    objective_history_iterations = []
     iterations_per_restart = []
+    total_search_iterations = 0
 
     for _ in range(max_restarts + 1):
         random_state = generate_initial_state(problem, seed=seed, rng=rng)
@@ -237,10 +239,12 @@ def hill_climbing_random_restart(
             best_result = result
 
         iterations_per_restart.append(result.iterations)
-        for value in result.objective_history:
-            objective_history.append(
-                max(objective_history[-1], value) if objective_history else value
-            )
+        objective_history.extend(result.objective_history)
+        objective_history_iterations.extend(
+            total_search_iterations + step
+            for step in range(len(result.objective_history))
+        )
+        total_search_iterations += result.iterations
 
     final_state = best_result.best_state.copy()
 
@@ -252,7 +256,7 @@ def hill_climbing_random_restart(
         initial_value=objective_history[0],
         final_value=best_result.best_value,
         best_value=best_result.best_value,
-        iterations=len(objective_history) - 1,
+        iterations=total_search_iterations,
         objective_history=objective_history,
         execution_time=perf_counter() - started_at,
         termination_reason="telah mencapai restart maksimum",
@@ -260,7 +264,8 @@ def hill_climbing_random_restart(
             "configured_max_restarts": max_restarts,
             "completed_restarts": len(iterations_per_restart) - 1,
             "iterations_per_restart": iterations_per_restart,
-            "total_search_iterations": sum(iterations_per_restart),
+            "total_search_iterations": total_search_iterations,
+            "objective_history_iterations": objective_history_iterations,
         },
         problem=problem,
     )

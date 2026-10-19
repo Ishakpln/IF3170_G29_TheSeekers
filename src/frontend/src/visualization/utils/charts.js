@@ -1,6 +1,15 @@
 const OBJECTIVE_COLOR = "#ff9a3c";
 const SECONDARY_COLOR = "#8fb9e8";
 
+function runningBest(values = []) {
+  let best = -Infinity;
+  return values.map((value) => {
+    if (!Number.isFinite(value)) return null;
+    best = Math.max(best, value);
+    return best;
+  });
+}
+
 export function objectiveChart(experiment) {
   const metrics = experiment.metrics || {};
   if (experiment.algorithm === "Genetic Algorithm") {
@@ -22,9 +31,27 @@ export function objectiveChart(experiment) {
       yLabel: "Objective value",
       series: [
         { label: "Current state", color: OBJECTIVE_COLOR, values: metrics.current_objective_history },
-        { label: "Best so far", color: SECONDARY_COLOR, dashed: true, values: experiment.objective_history },
+        { label: "Best so far", color: SECONDARY_COLOR, dashed: true, values: metrics.best_objective_history ?? runningBest(experiment.objective_history) },
       ],
       note: !metrics.current_objective_history?.length ? "Current-state objective history is unavailable for this run." : null,
+    };
+  }
+  if (experiment.algorithm === "Hill Climbing - Random Restart") {
+    const hasRawHistory = Array.isArray(metrics.objective_history_iterations);
+    const runs = (metrics.iterations_per_restart || []).flatMap((count, run) => Array(count + 1).fill(run + 1));
+    return {
+      title: "Objective over iterations",
+      xLabel: "Climbing iteration",
+      yLabel: "Objective value",
+      description: "Each restart starts at the preceding run's iteration count. Only climbing steps advance the count.",
+      series: [{
+        label: hasRawHistory ? "Search state" : "Best so far",
+        color: OBJECTIVE_COLOR,
+        values: experiment.objective_history,
+        iterations: metrics.objective_history_iterations,
+        runs,
+      }],
+      note: hasRawHistory ? null : "This saved run contains best-so-far history. Rerun it to record the values visited across restarts.",
     };
   }
   return {
@@ -60,13 +87,15 @@ export function chartData(chart) {
   const series = chart.series.map((item) => {
     const points = (Array.isArray(item.values) ? item.values : []).map((value, index) => {
       const parsed = typeof value === "number" || (typeof value === "string" && value.trim() !== "") ? Number(value) : NaN;
-      const iteration = index + (item.startIteration ?? 0);
-      if (!Number.isFinite(parsed)) return { iteration, value: null };
+      const iteration = item.iterations ? item.iterations[index] : index + (item.startIteration ?? 0);
+      const point = { iteration, value: parsed };
+      if (item.runs?.[index] !== undefined) point.run = item.runs[index];
+      if (!Number.isFinite(parsed) || !Number.isInteger(iteration) || iteration < 0) return { ...point, value: null };
       minimum = Math.min(minimum, parsed);
       maximum = Math.max(maximum, parsed);
       firstIteration = Math.min(firstIteration, iteration);
       lastIteration = Math.max(lastIteration, iteration);
-      return { iteration, value: parsed };
+      return point;
     });
     return { ...item, points };
   }).filter((item) => item.points.some((point) => point.value !== null));

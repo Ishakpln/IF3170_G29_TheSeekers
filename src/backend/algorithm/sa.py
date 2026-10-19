@@ -65,8 +65,9 @@ def simulated_annealing(
     accepted_worse_moves = 0
     rejected_moves = 0
     improving_moves = 0
-    objective_history = [best_value]
+    objective_history = [current_value]
     current_objective_history = [current_value]
+    best_objective_history = [best_value]
     temperature_history = [temperature]
     acceptance_probability_history = []
     termination_reason = "maximum iterations reached"
@@ -109,7 +110,8 @@ def simulated_annealing(
         temperature *= cooling_rate
         acceptance_probability_history.append(acceptance_probability)
         current_objective_history.append(current_value)
-        objective_history.append(best_value)
+        objective_history.append(current_value)
+        best_objective_history.append(best_value)
         temperature_history.append(temperature)
 
     if iterations >= max_iterations:
@@ -135,6 +137,7 @@ def simulated_annealing(
         metrics={
             "acceptance_probability_history": acceptance_probability_history,
             "current_objective_history": current_objective_history,
+            "best_objective_history": best_objective_history,
             "temperature_history": temperature_history,
             "stuck_frequency": stuck_frequency,
             "stuck_iterations": rejected_moves,

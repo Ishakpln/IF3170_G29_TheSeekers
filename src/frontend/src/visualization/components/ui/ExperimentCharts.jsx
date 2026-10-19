@@ -33,8 +33,8 @@ export function LineChart({ chart, compact = false }) {
   const xTicks = [...new Set([data.firstIteration, data.firstIteration + Math.floor(span / 2), data.lastIteration])];
   const selectedIteration = activeIteration === null ? null : Math.max(data.firstIteration, Math.min(data.lastIteration, activeIteration));
   const selectedPoints = data.series.flatMap((item) => {
-    const point = item.points.find((point) => point.iteration === selectedIteration && point.value !== null);
-    return point ? [{ ...point, label: item.label, color: item.color }] : [];
+    return item.points.filter((point) => point.iteration === selectedIteration && point.value !== null)
+      .map((point) => ({ ...point, label: `${item.label}${point.run ? ` · run ${point.run}` : ""}`, color: item.color }));
   });
 
   function pointerMove(event) {
@@ -93,7 +93,7 @@ export function LineChart({ chart, compact = false }) {
             const onlyPoint = item.points.filter((point) => point.value !== null);
             return <g key={item.label}>
               <path d={path} fill="none" stroke={item.color} strokeWidth="2.5" strokeDasharray={item.dashed ? "7 5" : undefined} vectorEffect="non-scaling-stroke" />
-              {onlyPoint.length === 1 && <circle cx={x(onlyPoint[0].iteration)} cy={y(onlyPoint[0].value)} r="3.5" fill={item.color} />}
+              {(onlyPoint.length === 1 || span === 0) && onlyPoint.map((point, index) => <circle key={index} cx={x(point.iteration)} cy={y(point.value)} r="3.5" fill={item.color} />)}
             </g>;
           })}
           {selectedIteration !== null && <line x1={x(selectedIteration)} x2={x(selectedIteration)} y1={padding.top} y2={padding.top + plotHeight} className="experiment-chart-crosshair" />}

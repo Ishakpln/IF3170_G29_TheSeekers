@@ -1,4 +1,5 @@
 import random
+from itertools import accumulate
 from time import perf_counter
 
 from .algorithm import Result, ga, hc, sa
@@ -114,19 +115,6 @@ def state_metrics(problem, state, objective_number=1):
 def _validate_result_contract(result):
     if not isinstance(result.iterations, int) or result.iterations < 0:
         raise RuntimeError("iterations must be a non-negative integer")
-    if len(result.objective_history) != result.iterations + 1:
-        raise RuntimeError(
-            "objective_history length must equal iterations + 1"
-        )
-    if (
-        result.algorithm != "Genetic Algorithm"
-        and result.objective_history[-1] != result.best_value
-    ):
-        raise RuntimeError("objective_history must end with best_value")
-    if result.best_value < result.initial_value:
-        raise RuntimeError("best_value must not be lower than initial_value")
-    if result.best_value < result.final_value:
-        raise RuntimeError("best_value must not be lower than final_value")
 
     required_metrics = REQUIRED_METRICS.get(result.algorithm, set())
     missing_metrics = required_metrics.difference(result.metrics)
@@ -134,6 +122,24 @@ def _validate_result_contract(result):
     if missing_metrics:
         missing = ", ".join(sorted(missing_metrics))
         raise RuntimeError(f"missing required metrics: {missing}")
+
+    is_random_restart = result.algorithm == "Hill Climbing - Random Restart"
+    restart_starts = result.metrics["completed_restarts"] if is_random_restart else 0
+    if len(result.objective_history) != result.iterations + restart_starts + 1:
+        raise RuntimeError(
+            "objective_history must include the initial state, each iteration, and each restart start"
+        )
+    if (
+        not is_random_restart
+        and result.objective_history[-1] != result.final_value
+    ):
+        raise RuntimeError("objective_history must end with final_value")
+    if max(result.objective_history) != result.best_value:
+        raise RuntimeError("best_value must equal the maximum recorded objective")
+    if result.best_value < result.initial_value:
+        raise RuntimeError("best_value must not be lower than initial_value")
+    if result.best_value < result.final_value:
+        raise RuntimeError("best_value must not be lower than final_value")
 
     if result.algorithm != "Genetic Algorithm":
         if result.objective_history[0] != result.initial_value:
@@ -166,12 +172,24 @@ def _validate_result_contract(result):
             raise RuntimeError(
                 "iterations_per_restart must contain non-negative integers"
             )
-        if (
-            sum(restart_iterations) + result.metrics["completed_restarts"]
-            != result.iterations
-        ):
+        if len(restart_iterations) != result.metrics["completed_restarts"] + 1:
+            raise RuntimeError("iterations_per_restart must include every run")
+        if sum(restart_iterations) != result.iterations:
             raise RuntimeError(
-                "iterations must include search iterations and restart transitions"
+                "iterations must count only climbing steps"
+            )
+        if result.metrics["total_search_iterations"] != result.iterations:
+            raise RuntimeError("total_search_iterations must equal iterations")
+        expected_iterations = []
+        completed_iterations = 0
+        for count in restart_iterations:
+            expected_iterations.extend(
+                completed_iterations + step for step in range(count + 1)
+            )
+            completed_iterations += count
+        if result.metrics["objective_history_iterations"] != expected_iterations:
+            raise RuntimeError(
+                "objective_history_iterations must preserve restart starts without adding iterations"
             )
         if (
             result.metrics["completed_restarts"]
@@ -180,6 +198,12 @@ def _validate_result_contract(result):
             raise RuntimeError("completed_restarts exceeds configured maximum")
 
     if result.algorithm == "Simulated Annealing":
+        if result.objective_history != result.metrics["current_objective_history"]:
+            raise RuntimeError("SA objective_history must record current-state values")
+        if result.metrics["best_objective_history"] != list(
+            accumulate(result.objective_history, max)
+        ):
+            raise RuntimeError("best_objective_history must track the running maximum")
         if (
             len(result.metrics["current_objective_history"])
             != result.iterations + 1
@@ -331,7 +355,7 @@ def run_algorithm(
     )
 
     if not result.objective_history:
-        result.objective_history.append(result.best_value)
+        result.objective_history.append(result.initial_value)
 
     _validate_result_contract(result)
 
