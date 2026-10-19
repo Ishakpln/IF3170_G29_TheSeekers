@@ -12,6 +12,7 @@ from ..core import (
     is_valid_state,
     move,
     rotate,
+    swap,
 )
 
 MIN_MUTATION_RATE = 0.01
@@ -74,8 +75,35 @@ def _mutate(problem, state, rng):
 
     package = rng.choice(problem.packages)
     placement = state.get_placement(package.id)
+    mutation = rng.random()
 
-    if rng.random() < 0.5:
+    if len(problem.packages) >= 2:
+        if mutation < 0.33:
+            mutation_type = "rotate"
+        elif mutation < 0.66:
+            mutation_type = "move"
+        else:
+            mutation_type = "swap"
+    elif mutation < 0.5:
+        mutation_type = "rotate"
+    else:
+        mutation_type = "move"
+
+    if mutation_type == "swap":
+        other = []
+        for i in problem.packages:
+            if i.id != package.id:
+                other.append(i)
+
+        second_package = rng.choice(other)
+        neighbor = swap(problem, state, package.id, second_package.id)
+
+        if neighbor is not None:
+            return neighbor
+
+        return state.copy()
+
+    if mutation_type == "rotate":
         axis = list(Axis)
         rng.shuffle(axis)
 
@@ -119,11 +147,26 @@ def _try_random_placement(problem, state, package, rng):
         if dimensions.height > truck.dimensions.height:
             continue
 
+        possible_z = [0]
+        for lower in state.get_placements_in_truck(truck.id):
+            if lower.package_id == package.id:
+                continue
+            if problem.get_package(lower.package_id).is_fragile:
+                continue
+
+            lower_dimensions = lower.orientation.apply(
+                problem.get_package(lower.package_id).dimensions
+            )
+            top = lower.position.z + lower_dimensions.height
+
+            if top + dimensions.height <= truck.dimensions.height:
+                possible_z.append(top)
+
         for i in range(3):
             position = Position(
                 rng.randint(0, truck.dimensions.width - dimensions.width),
                 rng.randint(0, truck.dimensions.length - dimensions.length),
-                0,
+                rng.choice(possible_z),
             )
             neighbor = move(problem, state, package.id, truck.id, position)
 

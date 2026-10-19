@@ -252,11 +252,25 @@ def generate_initial_state(
             if size.height > truck.dimensions.height:
                 continue
 
+            possible_z = [0]
+            for lower in state.get_placements_in_truck(truck.id):
+                if lower.package_id == placement.package_id:
+                    continue
+                if problem.get_package(lower.package_id).is_fragile:
+                    continue
+
+                lower_position = lower.position
+                lower_size = _oriented_dimensions(problem, lower)
+                top = lower_position.z + lower_size.height
+
+                if top + size.height <= truck.dimensions.height:
+                    possible_z.append(top)
+
             placement.truck_id = truck.id
             placement.position = Position(
                 rng.randint(0, truck.dimensions.width - size.width),
                 rng.randint(0, truck.dimensions.length - size.length),
-                0,
+                rng.choice(possible_z),
             )
 
             if is_valid_state(problem, state):
