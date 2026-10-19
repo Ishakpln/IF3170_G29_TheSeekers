@@ -14,7 +14,6 @@ from .objective import (
     evaluate_obj_func2,
     evaluate_obj_func3,
     evaluate_obj_func4,
-    evaluate_obj_func5,
     evaluate_state,
     get_objective_function,
 )
@@ -38,7 +37,6 @@ __all__ = [
     "evaluate_obj_func2",
     "evaluate_obj_func3",
     "evaluate_obj_func4",
-    "evaluate_obj_func5",
     "evaluate_state",
     "generate_all_neighbors",
     "generate_initial_state",

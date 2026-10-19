@@ -1,24 +1,39 @@
+#value paket dimuat
 def evaluate_obj_func(problem, state):
     return sum(
         problem.get_package(placement.package_id).value
         for placement in state.get_inside_placements()
     )
 
-
+#total paket dimuat
 def evaluate_obj_func2(problem, state):
-    return evaluate_obj_func(problem, state)
+    return len(state.get_inside_placements())
 
-
+#total volume paket yang dimuat
 def evaluate_obj_func3(problem, state):
-    return evaluate_obj_func(problem, state)
+    load_volume = 0
 
+    for placement in state.get_inside_placements():
+        package = problem.get_package(placement.package_id)
+        load_volume += (
+            package.dimensions.width * package.dimensions.length * package.dimensions.height)
 
+    return load_volume
+
+#total volume paket
 def evaluate_obj_func4(problem, state):
-    return evaluate_obj_func(problem, state)
+    tot_value = 0
+    load_volume = 0
 
+    for placement in state.get_inside_placements():
+        package = problem.get_package(placement.package_id)
+        tot_value += package.value
+        load_volume += (package.dimensions.width * package.dimensions.length * package.dimensions.height)
 
-def evaluate_obj_func5(problem, state):
-    return evaluate_obj_func(problem, state)
+    if load_volume == 0:
+        return 0
+
+    return tot_value / load_volume
 
 
 def get_objective_function(objective_number):
@@ -27,7 +42,6 @@ def get_objective_function(objective_number):
         2: evaluate_obj_func2,
         3: evaluate_obj_func3,
         4: evaluate_obj_func4,
-        5: evaluate_obj_func5,
     }
 
     if objective_number not in objective_functions:

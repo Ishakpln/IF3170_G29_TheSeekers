@@ -118,7 +118,10 @@ def _validate_result_contract(result):
         raise RuntimeError(
             "objective_history length must equal iterations + 1"
         )
-    if result.objective_history[-1] != result.best_value:
+    if (
+        result.algorithm != "Genetic Algorithm"
+        and result.objective_history[-1] != result.best_value
+    ):
         raise RuntimeError("objective_history must end with best_value")
     if result.best_value < result.initial_value:
         raise RuntimeError("best_value must not be lower than initial_value")
@@ -232,6 +235,11 @@ def _validate_result_contract(result):
             raise RuntimeError(
                 "GA objective_history must equal maximum_fitness_history"
             )
+        for maximum in maximum_history:
+            if result.best_value < maximum:
+                raise RuntimeError(
+                    "best_value must be at least the maximum fitness in every generation"
+                )
         if any(
             average > maximum
             for maximum, average in zip(maximum_history, average_history)
