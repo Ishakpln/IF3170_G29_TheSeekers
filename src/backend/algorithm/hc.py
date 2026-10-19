@@ -67,15 +67,12 @@ def hill_climbing_stochastic(
     max_iterations=1000,
     seed=None,
     objective_number=1,
-    sample_count=10,
 ):
     from random import Random
     from time import perf_counter
 
     if not isinstance(max_iterations, int) or max_iterations < 0:
         raise ValueError("max_iteration tidak valid")
-    if not isinstance(sample_count, int) or sample_count < 1:
-        raise ValueError("sample_count harus berupa bilangan bulat positif")
     if not is_valid_state(problem, state):
         raise ValueError("initial state tidak valid")
 
@@ -90,29 +87,17 @@ def hill_climbing_stochastic(
     rng = Random(seed)
 
     while iterations < max_iterations:
-        positive_neighbors = []
-        valid_samples = 0
+        try:
+            neighbor = generate_random_neighbor(problem, cur_state, seed=seed, rng=rng)
+        except RuntimeError:
+            neighbor = None
 
-        for _ in range(sample_count):
-            try:
-                neighbor = generate_random_neighbor(problem, cur_state, seed=seed, rng=rng)
-            except RuntimeError:
-                continue
-
+        if neighbor is not None:
             neighbor_value = evaluate_state(problem, neighbor, objective_number)
-            valid_samples += 1
             if neighbor_value > cur_value:
-                positive_neighbors.append((neighbor, neighbor_value))
+                cur_state = neighbor
+                cur_value = neighbor_value
 
-        if not positive_neighbors:
-            termination_reason = (
-                "tidak ada neighbor sampel yang valuenya lebih tinggi"
-                if valid_samples
-                else "gagal menghasilkan neighbor yang valid"
-            )
-            break
-
-        cur_state, cur_value = rng.choice(positive_neighbors)
         iterations += 1
         objective_history.append(cur_value)
 
@@ -130,7 +115,6 @@ def hill_climbing_stochastic(
         objective_history=objective_history,
         execution_time=perf_counter() - started_at,
         termination_reason=termination_reason,
-        metrics={"configured_sample_count": sample_count},
         problem=problem,
     )
 
