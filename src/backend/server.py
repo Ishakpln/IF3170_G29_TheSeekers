@@ -172,15 +172,20 @@ def parse_experiment_config(payload):
                 "minimum_temperature must be lower than initial_temperature"
             )
 
+        cooling_rate = float_value(
+            payload,
+            "cooling_rate",
+            0.99,
+            0,
+            1,
+        )
+
+        if cooling_rate >= 1:
+            raise ValueError("cooling_rate must be lower than one")
+
         config["algorithm_parameters"] = {
             "initial_temperature": initial_temperature,
-            "cooling_rate": float_value(
-                payload,
-                "cooling_rate",
-                0.99,
-                0,
-                1,
-            ),
+            "cooling_rate": cooling_rate,
             "minimum_temperature": minimum_temperature,
         }
     elif algorithm == "Genetic Algorithm":

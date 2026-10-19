@@ -231,14 +231,25 @@ def select_algorithm_parameters(algorithm_choice, hc_algorithm_name=None):
                 0,
             )
 
-        parameters["Simulated Annealing"] = {
-            "initial_temperature": initial_temperature,
-            "cooling_rate": select_float(
+        cooling_rate = select_float(
+            "Cooling rate SA",
+            DEFAULT_COOLING_RATE,
+            0,
+            1,
+        )
+
+        while cooling_rate >= 1:
+            print("Cooling rate harus lebih kecil dari 1.")
+            cooling_rate = select_float(
                 "Cooling rate SA",
                 DEFAULT_COOLING_RATE,
                 0,
                 1,
-            ),
+            )
+
+        parameters["Simulated Annealing"] = {
+            "initial_temperature": initial_temperature,
+            "cooling_rate": cooling_rate,
             "minimum_temperature": minimum_temperature,
         }
 
