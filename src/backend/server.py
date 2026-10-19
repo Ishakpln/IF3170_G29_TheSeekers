@@ -80,7 +80,7 @@ def normalize_saved_results():
             "config": {
                 "algorithm": result.algorithm,
                 "experiment_name": result.experiment_name,
-                "seed": result.metrics.get("seed", 42),
+                "seed": result.metrics.get("seed"),
                 "package_count": len(result.problem.packages),
                 "truck_count": len(result.problem.trucks),
                 "max_iterations": result.metrics.get(
@@ -140,13 +140,19 @@ def parse_experiment_config(payload):
         raise ValueError("objective_number must be an integer")
     get_objective_function(objective_number)
 
+    seed = payload.get("seed")
+    if seed is not None and (
+        isinstance(seed, bool) or not isinstance(seed, int) or seed < 0
+    ):
+        raise ValueError("seed must be a non-negative integer or null")
+
     config = {
         "algorithm": algorithm,
         "experiment_name": payload.get("experiment_name", "").strip() or None,
         "package_count": integer_value(payload, "package_count", 30, 1),
         "truck_count": integer_value(payload, "truck_count", 1, 1),
         "max_iterations": integer_value(payload, "max_iterations", 1000, 1),
-        "seed": integer_value(payload, "seed", 42, 0),
+        "seed": seed,
         "objective_number": objective_number,
         "algorithm_parameters": {},
     }

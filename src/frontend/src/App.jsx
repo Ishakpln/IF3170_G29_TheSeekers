@@ -131,7 +131,7 @@ function ResultCard({ experiment, onDetails }) {
               <span>Runtime</span>
               <strong>{Number(experiment.execution_time || 0).toFixed(3)}s</strong>
             </div>
-            <div><span>Seed</span><strong>{experiment.seed}</strong></div>
+            <div><span>Seed</span><strong>{experiment.seed ?? "Random"}</strong></div>
           </div>
         </>
       )}
@@ -150,26 +150,33 @@ function ResultCard({ experiment, onDetails }) {
 
 function ExperimentForm({ onClose, onCreated }) {
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [seedMode, setSeedMode] = useState("random");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   function update(event) {
     const { name, value, type } = event.target;
+    const numeric = type === "number" || name === "objective_number";
+    const nextValue = name === "seed" && value === "" ? "" : numeric ? Number(value) : value;
     setForm((current) => ({
       ...current,
-      [name]: type === "number" || name === "objective_number" ? Number(value) : value,
+      [name]: nextValue,
     }));
   }
 
   async function submit(event) {
     event.preventDefault();
+    if (seedMode === "set" && (!Number.isSafeInteger(form.seed) || form.seed < 0)) {
+      setError("Enter a non-negative whole-number seed within the supported range.");
+      return;
+    }
     setSubmitting(true);
     setError("");
 
     try {
       const created = await api("/api/experiments", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, seed: seedMode === "random" ? null : form.seed }),
       });
       onCreated(created);
     } catch (requestError) {
@@ -209,7 +216,14 @@ function ExperimentForm({ onClose, onCreated }) {
           <NumberField label="Package count" name="package_count" value={form.package_count} min="1" onChange={update} />
           <NumberField label="Truck count" name="truck_count" value={form.truck_count} min="1" onChange={update} />
           <NumberField label="Maximum iterations" name="max_iterations" value={form.max_iterations} min="1" onChange={update} />
-          <NumberField label="Random seed" name="seed" value={form.seed} min="0" onChange={update} />
+          <label className="field">
+            <span>Seed mode</span>
+            <select name="seed_mode" value={seedMode} onChange={(event) => setSeedMode(event.target.value)}>
+              <option value="random">Random</option>
+              <option value="set">Set seed</option>
+            </select>
+          </label>
+          {seedMode === "set" && <NumberField label="Seed" name="seed" value={form.seed} min="0" max={Number.MAX_SAFE_INTEGER} step="1" required onChange={update} />}
 
           {form.algorithm === "Hill Climbing - Sideways Move" && (
             <NumberField label="Maximum sideways" name="max_sideways" value={form.max_sideways} min="0" onChange={update} />
@@ -313,7 +327,7 @@ function OverviewPanel({ experiment }) {
           <dl>
             <div><dt>Iterations completed</dt><dd>{formatObjective(experiment.iterations)}</dd></div>
             <div><dt>Configured limit</dt><dd>{formatObjective(experiment.max_iterations)}</dd></div>
-            <div><dt>Random seed</dt><dd>{experiment.seed ?? "—"}</dd></div>
+            <div><dt>Seed</dt><dd>{experiment.seed ?? "Random"}</dd></div>
           </dl>
         </section>
 
