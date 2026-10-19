@@ -228,6 +228,19 @@ def _validate_result_contract(result):
             )
         if not 0 <= result.metrics["stuck_frequency"] <= 1:
             raise RuntimeError("stuck_frequency must be between 0 and 1")
+        local_optimum_history = result.metrics["local_optimum_history"]
+        if len(local_optimum_history) != result.iterations:
+            raise RuntimeError("local_optimum_history must contain one entry per iteration")
+        if not all(isinstance(value, bool) for value in local_optimum_history):
+            raise RuntimeError("local_optimum_history entries must be Boolean")
+        if result.metrics["stuck_iterations"] != sum(local_optimum_history):
+            raise RuntimeError("stuck_iterations must count local-optimum iterations")
+        expected_frequency = (
+            result.metrics["stuck_iterations"] / result.iterations
+            if result.iterations else 0.0
+        )
+        if result.metrics["stuck_frequency"] != expected_frequency:
+            raise RuntimeError("stuck_frequency must equal stuck_iterations / iterations")
         if any(
             probability < 0 or probability > 1
             for probability in result.metrics[

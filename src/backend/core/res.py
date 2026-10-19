@@ -20,6 +20,8 @@ REQUIRED_METRICS = {
         "best_objective_history",
         "temperature_history",
         "stuck_frequency",
+        "stuck_iterations",
+        "local_optimum_history",
     },
     "Genetic Algorithm": {
         "population_size",

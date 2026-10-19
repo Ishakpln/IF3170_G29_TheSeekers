@@ -213,7 +213,6 @@ def _is_local_optimum(
     objective_number,
     cancel_event=None,
 ):
-    """Return whether no valid one-step neighbor has a higher objective."""
     if objective_number == 1:
         return not _has_value_improving_neighbor(problem, state, cancel_event)
 
@@ -283,6 +282,9 @@ def simulated_annealing(
     accepted_worse_moves = 0
     rejected_moves = 0
     improving_moves = 0
+    stuck_iterations = 0
+    local_optimum_history = []
+    current_local_optimum = None
     objective_history = [current_value]
     current_objective_history = [current_value]
     best_objective_history = [best_value]
@@ -302,6 +304,16 @@ def simulated_annealing(
             termination_reason = "failed to generate a valid neighbor"
             break
 
+        if current_local_optimum is None:
+            current_local_optimum = _is_local_optimum(
+                problem,
+                current_state,
+                current_value,
+                objective_number,
+                cancel_event,
+            )
+        iteration_at_local_optimum = current_local_optimum
+
         neighbor_value = evaluate_state(problem, neighbor, objective_number)
         delta_energy = neighbor_value - current_value
         acceptance_probability = (
@@ -312,6 +324,7 @@ def simulated_annealing(
         if accepted:
             current_state = neighbor
             current_value = neighbor_value
+            current_local_optimum = None
             accepted_moves += 1
 
             if delta_energy > 0:
@@ -326,6 +339,8 @@ def simulated_annealing(
             best_value = current_value
 
         iterations += 1
+        stuck_iterations += int(iteration_at_local_optimum)
+        local_optimum_history.append(iteration_at_local_optimum)
         temperature *= cooling_rate
         acceptance_probability_history.append(acceptance_probability)
         current_objective_history.append(current_value)
@@ -340,17 +355,16 @@ def simulated_annealing(
 
     final_state = current_state.copy()
     rejection_rate = rejected_moves / iterations if iterations else 0.0
-    stuck_at_local_optimum = _is_local_optimum(
-        problem,
-        final_state,
-        current_value,
-        objective_number,
-        cancel_event,
-    )
-
-    # This is a per-run indicator. Its mean across repeated SA runs is the
-    # experimental frequency of getting stuck at a local optimum.
-    stuck_frequency = float(stuck_at_local_optimum)
+    stuck_at_local_optimum = current_local_optimum
+    if stuck_at_local_optimum is None:
+        stuck_at_local_optimum = _is_local_optimum(
+            problem,
+            final_state,
+            current_value,
+            objective_number,
+            cancel_event,
+        )
+    stuck_frequency = stuck_iterations / iterations if iterations else 0.0
 
     return Result(
         "Simulated Annealing",
@@ -370,6 +384,12 @@ def simulated_annealing(
             "best_objective_history": best_objective_history,
             "temperature_history": temperature_history,
             "stuck_frequency": stuck_frequency,
+            "stuck_iterations": stuck_iterations,
+            "local_optimum_history": local_optimum_history,
+            "stuck_frequency_definition": (
+                "Fraction of completed iterations whose pre-move current state "
+                "has no strictly improving valid one-step neighbor."
+            ),
             "stuck_at_local_optimum": stuck_at_local_optimum,
             "rejection_rate": rejection_rate,
             "accepted_moves": accepted_moves,

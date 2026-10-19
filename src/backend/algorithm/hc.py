@@ -290,22 +290,3 @@ def hill_climbing_random_restart(
     )
 
 
-# nanti hapus saja ini klo dh implement smua di atas
-def hill_climbing(
-    problem,
-    state,
-    max_iterations=1000,
-    seed=None,
-    objective_number=1,
-    max_restarts=5,
-    cancel_event=None,
-):
-    return hill_climbing_random_restart(
-        problem,
-        state,
-        max_iterations,
-        seed,
-        objective_number,
-        max_restarts,
-        cancel_event,
-    )

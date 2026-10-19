@@ -245,7 +245,6 @@ def run_experiment_job(job_id):
                 jobs[job_id]["completed_at"] = now_iso()
                 jobs[job_id]["result"] = result
     except CancelledError:
-        # Deleting a running job removes it from `jobs`; no result is retained.
         return
     except Exception as error:
         with jobs_lock:

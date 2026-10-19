@@ -350,7 +350,6 @@ def _rotate_neighbor(problem, state, rng):
 
 
 def generate_random_neighbor(problem, state, seed=None, max_attempts=100, *, rng=None):
-    """Reuse rng when supplied; otherwise initialize a new RNG from seed."""
     if not problem.trucks:
         raise ValueError("problem has no trucks")
     if not state.placements:
