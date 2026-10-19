@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import ExperimentPlots, { ObjectiveChart } from "./visualization/components/ui/ExperimentCharts.jsx";
 import { OBJECTIVES, formatObjective, selectedObjective } from "./visualization/utils/objectives.js";
+import { downloadExperimentReport, fetchExperimentReport } from "./services/reports.js";
 
 const StateVisualization = lazy(() => import("./visualization/StateVisualization.jsx"));
 
@@ -61,19 +62,6 @@ async function api(path, options = {}) {
 
   if (response.status === 204) return null;
   return response.json();
-}
-
-
-function downloadJson(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 
@@ -450,6 +438,8 @@ export default function App() {
   const [details, setDetails] = useState(null);
   const [sort, setSort] = useState("newest");
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   async function refresh() {
     try {
@@ -539,19 +529,43 @@ export default function App() {
     }
   }
 
+  async function exportRuns(runs) {
+    if (!runs.length || exporting) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      const results = await Promise.allSettled(runs.map((run) => fetchExperimentReport(run.id)));
+      const failed = [];
+      let downloaded = 0;
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          try {
+            downloadExperimentReport(result.value);
+            downloaded += 1;
+          } catch {
+            failed.push(runs[index].experiment_name || runs[index].id);
+          }
+        } else failed.push(runs[index].experiment_name || runs[index].id);
+      });
+      if (failed.length) {
+        const success = downloaded ? ` Downloaded ${downloaded} other report${downloaded === 1 ? "" : "s"}.` : "";
+        setExportError(`Could not export: ${failed.join(", ")}.${success}`);
+      }
+    } catch (requestError) {
+      setExportError(requestError.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function exportExperiments() {
-    const source = selected.size
-      ? experiments.filter((item) => selected.has(item.id))
-      : experiments;
-    const fullResults = await Promise.all(
-      source.map((item) => api(`/api/experiments/${item.id}`)),
-    );
-    downloadJson(fullResults, "experiment-results.json");
+    await exportRuns(experiments.filter((item) => selected.has(item.id)));
   }
 
   async function downloadExperiment(id) {
-    const data = await api(`/api/experiments/${id}`);
-    downloadJson(data, `experiment-${id}.json`);
+    const run = experiments.find((item) => item.id === id);
+    if (run) await exportRuns([run]);
+    setContextMenu(null);
   }
 
   return (
@@ -560,7 +574,7 @@ export default function App() {
         <div className="sidebar-inner">
           <header className="sidebar-toolbar">
             <button className="add-button" onClick={() => setShowForm(true)} title="Run experiment">+</button>
-            <button className="export-button" onClick={exportExperiments}>Export</button>
+            <button className="export-button" onClick={exportExperiments} disabled={!selected.size || exporting} title="Download one TXT report per checked run">{exporting ? "Exporting…" : "Export"}</button>
             <select value={sort} onChange={(event) => setSort(event.target.value)} title="Sort results">
               <option value="newest">Newest</option>
               <option value="value">Value</option>
@@ -609,7 +623,7 @@ export default function App() {
       </div>
 
       <main className="workspace">
-        {error && <div className="error-banner" onClick={() => setError("")}>{error}</div>}
+        {(error || exportError) && <div className="error-banner" role="alert" onClick={() => { setError(""); setExportError(""); }}>{exportError || error}</div>}
         {!displayed.length ? (
           <div className="empty-workspace">
             <strong>No result selected</strong>
@@ -643,7 +657,7 @@ export default function App() {
             {experiment.status !== "pending" && (
               <button onClick={() => openDetails(experiment.id)}>View details</button>
             )}
-            <button onClick={() => downloadExperiment(experiment.id)}>Download JSON</button>
+            <button onClick={() => downloadExperiment(experiment.id)} disabled={exporting}>Download TXT</button>
             <hr />
             <button
               className="danger"

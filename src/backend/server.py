@@ -1,5 +1,4 @@
 import atexit
-import json
 import os
 from concurrent.futures import CancelledError, ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -11,6 +10,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from .core import ResultContainer, get_objective_function
 from .orchestration import ALGORITHMS, prepare_initial_state, run_algorithm, state_rows
+from .reporting import experiment_report, report_filename
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -431,14 +431,12 @@ def export_experiment(job_id):
         if job is None:
             return jsonify({"error": "experiment not found"}), 404
 
-        response = app.response_class(
-            json.dumps(serialize_job(job, include_details=True), indent=2),
-            mimetype="application/json",
-        )
-        response.headers["Content-Disposition"] = (
-            f'attachment; filename="experiment-{job_id}.json"'
-        )
-        return response
+        data = serialize_job(job, include_details=True)
+    response = app.response_class(experiment_report(data), mimetype="text/plain")
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="{report_filename(data)}"'
+    )
+    return response
 
 
 @app.get("/")
