@@ -4,6 +4,7 @@ import PackageInspector from "./components/ui/PackageInspector.jsx";
 import PackageList from "./components/ui/PackageList.jsx";
 import VisualizationToolbar from "./components/ui/VisualizationToolbar.jsx";
 import { buildSceneLayout, hasDimensions, summarizeState } from "./utils/state.js";
+import { formatObjective } from "./utils/objectives.js";
 import "./style/visualization.css";
 
 export default function StateVisualization({ rows, trucks = [], value, stateLabel }) {
@@ -33,7 +34,7 @@ export default function StateVisualization({ rows, trucks = [], value, stateLabe
     <section className="state-visualization" aria-label={`${stateLabel} 3D visualization`}>
       <div className="viz-heading"><div><span>SPATIAL VIEW</span><h3>{stateLabel}</h3></div><span className="viz-live-badge"><i />{truck.id}</span></div>
       <div className="viz-summary">
-        <div><span>Objective value</span><strong>{value ?? summary.value}</strong></div>
+        <div><span>Objective value</span><strong title={String(value ?? summary.value)}>{formatObjective(value ?? summary.value)}</strong></div>
         <div><span>Loaded · all trucks</span><strong>{summary.loaded}<small> / {rows.length}</small></strong></div>
         <div><span>Outside</span><strong>{summary.outside}</strong></div>
         <div><span>{truck.id} weight</span><strong>{summary.weight}<small> / {truck.max_capacity ?? "—"}</small></strong></div>

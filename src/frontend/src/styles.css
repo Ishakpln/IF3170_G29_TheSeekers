@@ -255,12 +255,6 @@ button { cursor: pointer; }
 .objective-summary small { display: inline-block; padding: 3px 5px; background: rgba(39, 206, 122, .08); font-size: 9px; }
 .positive { color: var(--green); }
 .negative { color: var(--red); }
-.objective-chart { display: block; width: 100%; max-height: 175px; }
-.objective-chart text { fill: #777; font-size: 10px; }
-.chart-grid { stroke: #292929; }
-.chart-line { fill: none; stroke: var(--orange); stroke-width: 3; }
-.objective-chart circle { fill: var(--orange); }
-.chart-empty { display: grid; place-content: center; min-height: 150px; color: #595959; }
 
 .card-metrics {
   display: grid;
@@ -348,6 +342,7 @@ button { cursor: pointer; }
 .field { display: grid; gap: 6px; }
 .field-wide { grid-column: 1 / -1; margin-bottom: 13px; }
 .field span { color: #aaa; font-size: 11px; font-weight: 700; }
+.field-description { color: #aaa; font-size: 11px; line-height: 1.5; }
 .field input, .field select {
   width: 100%;
   height: 42px;
@@ -384,13 +379,14 @@ button { cursor: pointer; }
   cursor: pointer;
 }
 
-.details-modal { width: min(1100px, 96vw); }
+.details-modal { width: min(1100px, calc(100vw - 48px)); max-width: 100%; }
 .detail-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .detail-stats > div { padding: 12px; border: 1px solid #292b33; background: #171820; }
 .detail-stats span { display: block; color: #777; font-size: 10px; }
 .detail-stats strong { display: block; margin-top: 4px; font-size: 20px; }
+.detail-objective { margin: 7px 0 0; color: #aaa; font-size: 12px; }
 .detail-tabs { display: flex; gap: 4px; margin: 18px 0 10px; overflow-x: auto; }
-.detail-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #888; text-transform: capitalize; }
+.detail-tabs button { flex-shrink: 0; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #888; text-transform: capitalize; }
 .detail-tabs button.active { border-color: var(--orange); color: white; }
 .detail-content { min-height: 260px; padding: 14px; border: 1px solid #292b33; background: #0d0e12; }
 .detail-content pre { margin: 0; white-space: pre-wrap; }
@@ -404,4 +400,10 @@ th { position: sticky; top: 0; background: #191a20; color: #999; }
   .sidebar-inner { width: 315px; }
   .cards-grid { grid-auto-columns: minmax(500px, 82vw); }
   .toggle-rail button { width: 50px; height: 112px; }
+}
+
+@media (max-width: 560px) {
+  .details-modal { min-width: 0; padding: 16px; }
+  .detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-content { padding: 10px; }
 }

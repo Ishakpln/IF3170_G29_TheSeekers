@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from .core import ResultContainer
+from .core import ResultContainer, get_objective_function
 from .orchestration import ALGORITHMS, prepare_initial_state, run_algorithm, state_rows
 
 
@@ -134,6 +134,11 @@ def parse_experiment_config(payload):
     if algorithm not in ALGORITHMS:
         raise ValueError("unknown algorithm")
 
+    objective_number = payload.get("objective_number", 1)
+    if isinstance(objective_number, bool) or not isinstance(objective_number, int):
+        raise ValueError("objective_number must be an integer")
+    get_objective_function(objective_number)
+
     config = {
         "algorithm": algorithm,
         "experiment_name": payload.get("experiment_name", "").strip() or None,
@@ -141,7 +146,7 @@ def parse_experiment_config(payload):
         "truck_count": integer_value(payload, "truck_count", 1, 1),
         "max_iterations": integer_value(payload, "max_iterations", 1000, 1),
         "seed": integer_value(payload, "seed", 42, 0),
-        "objective_number": 1,
+        "objective_number": objective_number,
         "algorithm_parameters": {},
     }
 
@@ -243,6 +248,7 @@ def serialize_job(job, include_details=False):
         "package_count": config["package_count"],
         "truck_count": config["truck_count"],
         "max_iterations": config["max_iterations"],
+        "objective_number": config["objective_number"],
         "algorithm_parameters": json_safe(config["algorithm_parameters"]),
         "created_at": job["created_at"],
         "completed_at": job.get("completed_at"),

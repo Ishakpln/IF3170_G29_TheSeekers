@@ -1,0 +1,22 @@
+.experiment-plots { display: grid; gap: 22px; }
+.experiment-chart { min-width: 0; width: 100%; margin: 0; padding: 16px; border: 1px solid #30323a; border-radius: 6px; background: #111218; }
+.experiment-chart figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.experiment-chart h3 { margin: 0; color: #e2e5e9; font-size: 13px; font-weight: 600; }
+.experiment-chart-legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: #bcc2cb; font-size: 11px; }
+.experiment-chart-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.experiment-chart-legend i { width: 18px; border-top-width: 2px; }
+.experiment-chart-stage { position: relative; }
+.experiment-chart svg { display: block; width: 100%; height: auto; overflow: visible; outline-offset: 2px; }
+.experiment-chart svg:focus-visible { outline: 2px solid #ff9a3c; }
+.experiment-chart svg text { fill: #a0a6b1; font-size: 12px; }
+.experiment-chart-grid, .experiment-chart-axis { stroke: #30323a; }
+.experiment-chart-crosshair { stroke: #8993a2; stroke-width: 1px; stroke-dasharray: 3 4; }
+.experiment-chart-tooltip { position: absolute; top: 12px; right: 12px; display: grid; gap: 4px; padding: 9px 11px; border: 1px solid #49505d; border-radius: 4px; background: #111218ef; color: #dce0e7; font-size: 11px; pointer-events: none; }
+.experiment-chart-tooltip strong { font-weight: 600; }
+.experiment-chart-note { margin: 8px 0 0; color: #a0a6b1; font-size: 11px; line-height: 1.5; }
+.experiment-chart-empty { display: grid; place-content: center; min-height: 130px; padding: 16px; color: #a0a6b1; font-size: 12px; text-align: center; }
+.experiment-chart.compact { padding: 0; border: 0; background: transparent; }
+.experiment-chart.compact figcaption { justify-content: flex-start; gap: 5px 10px; margin-bottom: 2px; }
+.experiment-chart.compact h3, .experiment-chart.compact .experiment-chart-legend { font-size: 9px; }
+.experiment-chart.compact svg text { font-size: 11px; }
+.experiment-chart.compact .experiment-chart-note { font-size: 9px; }

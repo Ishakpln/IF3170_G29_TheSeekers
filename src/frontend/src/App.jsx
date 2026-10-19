@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import ExperimentPlots, { ObjectiveChart } from "./visualization/components/ui/ExperimentCharts.jsx";
+import { OBJECTIVES, formatObjective, selectedObjective } from "./visualization/utils/objectives.js";
 
 const StateVisualization = lazy(() => import("./visualization/StateVisualization.jsx"));
 
@@ -23,6 +25,7 @@ const LABELS = {
 
 const DEFAULT_FORM = {
   algorithm: ALGORITHMS[0],
+  objective_number: 1,
   experiment_name: "",
   package_count: 30,
   truck_count: 1,
@@ -74,66 +77,10 @@ function downloadJson(data, filename) {
 }
 
 
-function ObjectiveChart({ history }) {
-  const values = (history || []).map(Number).filter(Number.isFinite);
-
-  if (!values.length) {
-    return <div className="chart-empty">Waiting for objective data…</div>;
-  }
-
-  const width = 420;
-  const height = 180;
-  const padding = { left: 46, right: 10, top: 14, bottom: 30 };
-  const plotWidth = width - padding.left - padding.right;
-  const plotHeight = height - padding.top - padding.bottom;
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const range = maximum - minimum || 1;
-  const points = values.map((value, index) => ({
-    x:
-      values.length === 1
-        ? padding.left + plotWidth / 2
-        : padding.left + (index / (values.length - 1)) * plotWidth,
-    y: padding.top + ((maximum - value) / range) * plotHeight,
-  }));
-  const pointString = points.map((point) => `${point.x},${point.y}`).join(" ");
-
-  return (
-    <svg className="objective-chart" viewBox={`0 0 ${width} ${height}`}>
-      {[0, 0.5, 1].map((ratio) => {
-        const y = padding.top + ratio * plotHeight;
-        const label = maximum - ratio * (maximum - minimum);
-
-        return (
-          <g key={ratio}>
-            <line
-              x1={padding.left}
-              x2={width - padding.right}
-              y1={y}
-              y2={y}
-              className="chart-grid"
-            />
-            <text x={padding.left - 7} y={y + 4} textAnchor="end">
-              {label.toFixed(label % 1 ? 1 : 0)}
-            </text>
-          </g>
-        );
-      })}
-      <polyline points={pointString} className="chart-line" />
-      {points.map((point, index) => (
-        <circle key={index} cx={point.x} cy={point.y} r="3.5" />
-      ))}
-      <text x={padding.left + plotWidth / 2} y={height - 5} textAnchor="middle">
-        Iteration
-      </text>
-    </svg>
-  );
-}
-
-
 function ResultCard({ experiment, onDetails }) {
   const pending = experiment.status === "pending";
   const failed = experiment.status === "failed";
+  const objective = selectedObjective(experiment);
   const delta =
     experiment.best_value == null || experiment.initial_value == null
       ? null
@@ -169,14 +116,14 @@ function ResultCard({ experiment, onDetails }) {
         <>
           <div className="card-content">
             <div className="objective-summary">
-              <span>Best objective</span>
-              <strong>{experiment.best_value}</strong>
+              <span title={objective.description}>Best {objective.label.toLowerCase()}</span>
+              <strong title={String(experiment.best_value)}>{formatObjective(experiment.best_value)}</strong>
               <small className={delta >= 0 ? "positive" : "negative"}>
                 {delta >= 0 ? "+" : ""}
-                {delta} from initial
+                {formatObjective(delta)} from initial
               </small>
             </div>
-            <ObjectiveChart history={experiment.objective_history} />
+            <ObjectiveChart experiment={experiment} compact />
           </div>
           <div className="card-metrics">
             <div><span>Iterations</span><strong>{experiment.iterations}</strong></div>
@@ -210,7 +157,7 @@ function ExperimentForm({ onClose, onCreated }) {
     const { name, value, type } = event.target;
     setForm((current) => ({
       ...current,
-      [name]: type === "number" ? Number(value) : value,
+      [name]: type === "number" || name === "objective_number" ? Number(value) : value,
     }));
   }
 
@@ -244,6 +191,14 @@ function ExperimentForm({ onClose, onCreated }) {
           <select name="algorithm" value={form.algorithm} onChange={update}>
             {ALGORITHMS.map((algorithm) => <option key={algorithm}>{algorithm}</option>)}
           </select>
+        </label>
+
+        <label className="field field-wide">
+          <span>Objective function</span>
+          <select name="objective_number" value={form.objective_number} onChange={update}>
+            {OBJECTIVES.map((objective) => <option key={objective.id} value={objective.id}>{objective.label}</option>)}
+          </select>
+          <small className="field-description">{selectedObjective(form).description}</small>
         </label>
 
         <div className="form-grid">
@@ -302,17 +257,17 @@ function DetailsModal({ experiment, onClose }) {
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section className="modal details-modal" role="dialog" aria-modal="true" aria-label="Experiment details" onMouseDown={(event) => event.stopPropagation()}>
         <header className="modal-header">
-          <div><span>RUN DETAILS</span><h2>{experiment.algorithm}</h2></div>
+          <div><span>RUN DETAILS</span><h2>{experiment.algorithm}</h2><p className="detail-objective">{selectedObjective(experiment).label}</p></div>
           <button onClick={onClose}>×</button>
         </header>
         <div className="detail-stats">
-          <div><span>Initial</span><strong>{experiment.initial_value ?? "—"}</strong></div>
-          <div><span>Final</span><strong>{experiment.final_value ?? "—"}</strong></div>
-          <div><span>Best</span><strong>{experiment.best_value ?? "—"}</strong></div>
+          <div><span>Initial</span><strong title={String(experiment.initial_value)}>{formatObjective(experiment.initial_value)}</strong></div>
+          <div><span>Final</span><strong title={String(experiment.final_value)}>{formatObjective(experiment.final_value)}</strong></div>
+          <div><span>Best</span><strong title={String(experiment.best_value)}>{formatObjective(experiment.best_value)}</strong></div>
           <div><span>Runtime</span><strong>{experiment.execution_time == null ? "—" : `${experiment.execution_time.toFixed(4)}s`}</strong></div>
         </div>
         <nav className="detail-tabs">
-          {["overview", "initial_state", "final_state", "best_state", "metrics"].map((name) => (
+          {["overview", "plots", "initial_state", "final_state", "best_state", "metrics"].map((name) => (
             <button key={name} className={tab === name ? "active" : ""} onClick={() => setTab(name)}>
               {name.replace("_", " ")}
             </button>
@@ -323,10 +278,13 @@ function DetailsModal({ experiment, onClose }) {
             status: experiment.status,
             saved: experiment.saved,
             iterations: experiment.iterations,
+            objective_number: selectedObjective(experiment).id,
+            objective_function: selectedObjective(experiment).label,
             termination_reason: experiment.termination_reason,
             parameters: experiment.algorithm_parameters,
           }, null, 2)}</pre>}
           {tab === "metrics" && <pre>{JSON.stringify(experiment.metrics || {}, null, 2)}</pre>}
+          {tab === "plots" && <ExperimentPlots experiment={experiment} />}
           {["initial_state", "final_state", "best_state"].includes(tab) && (
             <>
               <div className="state-view-switch" role="group" aria-label="State display mode">
@@ -506,7 +464,7 @@ export default function App() {
                 <span className="row-algorithm" title={experiment.algorithm}>
                   {LABELS[experiment.algorithm] || experiment.algorithm}
                 </span>
-                <span>{experiment.best_value ?? "—"}</span>
+                <span title={String(experiment.best_value)}>{formatObjective(experiment.best_value)}</span>
                 <span className={`row-status ${experiment.status}`}>{experiment.status}</span>
                 <input
                   type="checkbox"
