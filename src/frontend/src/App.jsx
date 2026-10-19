@@ -394,7 +394,6 @@ export default function App() {
   const sortedExperiments = useMemo(() => {
     const items = [...experiments];
     if (sort === "value") return items.sort((a, b) => (b.best_value ?? -Infinity) - (a.best_value ?? -Infinity));
-    if (sort === "runtime") return items.sort((a, b) => (a.execution_time ?? Infinity) - (b.execution_time ?? Infinity));
     if (sort === "algorithm") return items.sort((a, b) => a.algorithm.localeCompare(b.algorithm));
     return items.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [experiments, sort]);
@@ -468,12 +467,11 @@ export default function App() {
             <select value={sort} onChange={(event) => setSort(event.target.value)} title="Sort results">
               <option value="newest">Newest</option>
               <option value="value">Value</option>
-              <option value="runtime">Runtime</option>
               <option value="algorithm">Algorithm</option>
             </select>
           </header>
           <div className="list-header">
-            <span>Algorithm</span><span>Runtime</span><span>Value</span><span>Status</span><span />
+            <span>Experiment</span><span>Algorithm</span><span>Value</span><span>Status</span><span />
           </div>
           <div className="result-list">
             {sortedExperiments.map((experiment) => (
@@ -486,8 +484,10 @@ export default function App() {
                   setContextMenu({ id: experiment.id, x: event.clientX, y: event.clientY });
                 }}
               >
-                <strong>{LABELS[experiment.algorithm] || experiment.algorithm}</strong>
-                <span>{experiment.execution_time == null ? "—" : `${experiment.execution_time.toFixed(2)}s`}</span>
+                <strong title={experiment.experiment_name}>{experiment.experiment_name}</strong>
+                <span className="row-algorithm" title={experiment.algorithm}>
+                  {LABELS[experiment.algorithm] || experiment.algorithm}
+                </span>
                 <span>{experiment.best_value ?? "—"}</span>
                 <span className={`row-status ${experiment.status}`}>{experiment.status}</span>
                 <input

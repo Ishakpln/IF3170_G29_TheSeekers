@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from src.orchestration import (
+from .orchestration import (
     prepare_initial_state,
     run_algorithm,
     run_all_algorithms,
     state_metrics,
     state_rows,
 )
-from src.core import ResultContainer, state_signature
+from .core import ResultContainer, state_signature
 
 
 ALGORITHM_NAMES = {
@@ -25,7 +25,7 @@ HC_ALGORITHM_NAMES = {
 PACKAGE_COUNT = 30
 DATASET_SEED = 42
 OBJECTIVE_NUMBER = 1
-RESULT_OUTPUT_FILE = Path(__file__).resolve().parent.parent / "output" / "results.pkl"
+RESULT_OUTPUT_FILE = Path(__file__).resolve().parents[2] / "output" / "results.pkl"
 DEFAULT_MAX_ITERATIONS = 1000
 DEFAULT_MAX_RESTARTS = 5
 DEFAULT_MAX_SIDEWAYS = 100

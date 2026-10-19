@@ -9,15 +9,15 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from src.core import ResultContainer
-from src.orchestration import ALGORITHMS, prepare_initial_state, run_algorithm, state_rows
+from .core import ResultContainer
+from .orchestration import ALGORITHMS, prepare_initial_state, run_algorithm, state_rows
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_FILE = Path(
     os.environ.get("IF3170_RESULTS_FILE", str(PROJECT_ROOT / "output" / "results.pkl"))
 )
-FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+FRONTEND_DIST = PROJECT_ROOT / "src" / "frontend" / "dist"
 MAX_WORKERS = max(2, min(8, os.cpu_count() or 4))
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIST), static_url_path="")
