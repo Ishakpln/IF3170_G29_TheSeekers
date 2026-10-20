@@ -52,20 +52,22 @@ button { cursor: pointer; }
   padding: 0 0 3px;
   border: 0;
   border-radius: 50%;
-  background: #79bb24;
-  color: white;
+  background: var(--orange);
+  color: #111;
   font-size: 32px;
   line-height: 1;
 }
+.add-button:hover { background: #ff9f2e; }
 
 .export-button {
   height: 40px;
-  border: 0;
+  border: 1px solid #424242;
   border-radius: 3px;
-  background: #2898cd;
+  background: #101010;
   color: white;
   font-weight: 800;
 }
+.export-button:hover { border-color: var(--orange); background: #181818; }
 
 .sidebar-toolbar select {
   min-width: 0;

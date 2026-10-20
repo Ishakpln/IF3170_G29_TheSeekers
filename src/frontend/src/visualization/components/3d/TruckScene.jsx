@@ -5,7 +5,7 @@ import { buildSceneObjects, disposeObjects } from "../../utils/scene.js";
 
 function createViewer(host, onSelect, onHover, onError) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#121b19");
+  scene.background = new THREE.Color("#08090b");
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2000);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));

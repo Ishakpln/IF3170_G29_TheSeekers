@@ -17,14 +17,14 @@ export function disposeObjects(root) {
   geometries.forEach((geometry) => geometry.dispose());
 }
 
-function label(text, color = "#dce8df", width = 2.2) {
+function label(text, color = "#e2e4e8", width = 2.2) {
   const canvas = document.createElement("canvas");
   canvas.width = 384;
   canvas.height = 96;
   const context = canvas.getContext("2d");
-  context.fillStyle = "rgba(14, 23, 20, 0.9)";
+  context.fillStyle = "rgba(8, 9, 11, 0.92)";
   context.fillRect(2, 2, 380, 92);
-  context.strokeStyle = "#4a6053";
+  context.strokeStyle = "#454851";
   context.strokeRect(2, 2, 380, 92);
   context.fillStyle = color;
   context.font = "600 36px system-ui, sans-serif";
@@ -55,7 +55,7 @@ function grid(width, length) {
   for (let z = 0; z <= length; z += step) points.push(0, 0.002, z, width, 0.002, z);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
-  return new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: "#44574a", transparent: true, opacity: 0.55 }));
+  return new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: "#464951", transparent: true, opacity: 0.55 }));
 }
 
 export function buildSceneObjects(layout) {
@@ -63,22 +63,22 @@ export function buildSceneObjects(layout) {
   const meshes = new Map();
   const labels = new Map();
   const { truck, staging } = layout;
-  root.add(floor(truck.width, truck.length, 0, "#27362d"), grid(truck.width, truck.length));
+  root.add(floor(truck.width, truck.length, 0, "#24262c"), grid(truck.width, truck.length));
 
   const containerGeometry = new THREE.BoxGeometry(truck.width, truck.height, truck.length);
   const container = new THREE.Mesh(containerGeometry, new THREE.MeshBasicMaterial({
-    color: "#9bc2ac", opacity: 0.035, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    color: "#c8ccd4", opacity: 0.035, transparent: true, depthWrite: false, side: THREE.DoubleSide,
   }));
   container.position.set(truck.width / 2, truck.height / 2, truck.length / 2);
   root.add(container);
   const frame = new THREE.LineSegments(
     new THREE.EdgesGeometry(containerGeometry),
-    new THREE.LineBasicMaterial({ color: "#95b7a1", transparent: true, opacity: 0.7 }),
+    new THREE.LineBasicMaterial({ color: "#8d929c", transparent: true, opacity: 0.7 }),
   );
   frame.position.copy(container.position);
   root.add(frame);
 
-  const truckLabel = label(`TRUCK ${truck.id}`, "#acd5b5", 3.6);
+  const truckLabel = label(`TRUCK ${truck.id}`, "#ffad4d", 3.6);
   truckLabel.position.set(truck.width / 2, 0.2, -1.3);
   root.add(truckLabel);
   if (staging) {
