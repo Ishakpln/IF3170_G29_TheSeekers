@@ -292,6 +292,34 @@ function parameterValue(name, value) {
   return String(value);
 }
 
+function AnnealingSummary({ experiment }) {
+  const metrics = experiment.metrics || {};
+  const frequency = Number.isFinite(metrics.stuck_frequency)
+    ? new Intl.NumberFormat("en-US", { style: "percent", maximumSignificantDigits: 4 }).format(metrics.stuck_frequency)
+    : "Not recorded";
+  const iterations = Number.isInteger(metrics.stuck_iterations) && Number.isInteger(experiment.iterations)
+    ? `${formatObjective(metrics.stuck_iterations)} / ${formatObjective(experiment.iterations)}`
+    : "Not recorded";
+  const finalOptimum = typeof metrics.stuck_at_local_optimum === "boolean"
+    ? (metrics.stuck_at_local_optimum ? "Yes" : "No")
+    : "Not recorded";
+
+  return (
+    <section className="overview-parameters overview-annealing" aria-label="Simulated annealing local optima">
+      <header><span>SIMULATED ANNEALING</span><h4>Local optima</h4></header>
+      <div className="parameter-grid">
+        <div><span>Stuck frequency</span><strong title={metrics.stuck_frequency == null ? undefined : String(metrics.stuck_frequency)}>{frequency}</strong></div>
+        <div><span>Stuck / completed iterations</span><strong>{iterations}</strong></div>
+        <div><span>Final state is a local optimum</span><strong>{finalOptimum}</strong></div>
+      </div>
+      <p className="overview-explanation">
+        An iteration counts as stuck when its state before the move has no valid neighbor with a higher objective value.
+        {" "}Frequency is stuck iterations divided by completed iterations.
+      </p>
+    </section>
+  );
+}
+
 function OverviewPanel({ experiment }) {
   const objective = selectedObjective(experiment);
   const parameters = Object.entries(experiment.algorithm_parameters || {});
@@ -346,6 +374,8 @@ function OverviewPanel({ experiment }) {
           </dl>
         </section>
       </div>
+
+      {experiment.algorithm === "Simulated Annealing" && <AnnealingSummary experiment={experiment} />}
 
       <section className="overview-parameters">
         <header><span>CONFIGURATION</span><h4>Algorithm parameters</h4></header>

@@ -460,6 +460,7 @@ button { cursor: pointer; }
 .parameter-grid span { color: #858b95; font-size: 9px; text-transform: capitalize; }
 .parameter-grid strong { color: #e4e7eb; font-size: 12px; font-weight: 700; }
 .overview-empty-parameters { margin: 12px 0 0; color: #858b95; font-size: 11px; }
+.overview-explanation { margin: 12px 0 0; color: #9fa4ad; font-size: 11px; line-height: 1.6; }
 .table-wrap { max-height: 390px; overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 11px; }
 th, td { padding: 7px 9px; border-bottom: 1px solid #272727; text-align: left; white-space: nowrap; }
