@@ -228,19 +228,30 @@ def _validate_result_contract(result):
             )
         if not 0 <= result.metrics["stuck_frequency"] <= 1:
             raise RuntimeError("stuck_frequency must be between 0 and 1")
-        local_optimum_history = result.metrics["local_optimum_history"]
-        if len(local_optimum_history) != result.iterations:
-            raise RuntimeError("local_optimum_history must contain one entry per iteration")
-        if not all(isinstance(value, bool) for value in local_optimum_history):
-            raise RuntimeError("local_optimum_history entries must be Boolean")
-        if result.metrics["stuck_iterations"] != sum(local_optimum_history):
-            raise RuntimeError("stuck_iterations must count local-optimum iterations")
+        stuck_history = result.metrics["stuck_history"]
+        if len(stuck_history) != result.iterations:
+            raise RuntimeError("stuck_history must contain one entry per iteration")
+        if not all(isinstance(value, bool) for value in stuck_history):
+            raise RuntimeError("stuck_history entries must be Boolean")
+        if result.metrics["stuck_iterations"] != sum(stuck_history):
+            raise RuntimeError("stuck_iterations must count rejected proposals")
+        if result.metrics["stuck_iterations"] != result.metrics["rejected_moves"]:
+            raise RuntimeError("stuck_iterations must equal rejected_moves")
+        if (
+            result.metrics["accepted_moves"] + result.metrics["rejected_moves"]
+            != result.iterations
+        ):
+            raise RuntimeError(
+                "accepted_moves plus rejected_moves must equal iterations"
+            )
         expected_frequency = (
             result.metrics["stuck_iterations"] / result.iterations
             if result.iterations else 0.0
         )
         if result.metrics["stuck_frequency"] != expected_frequency:
             raise RuntimeError("stuck_frequency must equal stuck_iterations / iterations")
+        if result.metrics["rejection_rate"] != expected_frequency:
+            raise RuntimeError("rejection_rate must equal rejected_moves / iterations")
         if any(
             probability < 0 or probability > 1
             for probability in result.metrics[

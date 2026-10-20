@@ -300,21 +300,25 @@ function AnnealingSummary({ experiment }) {
   const iterations = Number.isInteger(metrics.stuck_iterations) && Number.isInteger(experiment.iterations)
     ? `${formatObjective(metrics.stuck_iterations)} / ${formatObjective(experiment.iterations)}`
     : "Not recorded";
-  const finalOptimum = typeof metrics.stuck_at_local_optimum === "boolean"
-    ? (metrics.stuck_at_local_optimum ? "Yes" : "No")
+  const accepted = Number.isInteger(metrics.accepted_moves)
+    ? formatObjective(metrics.accepted_moves)
+    : "Not recorded";
+  const rejected = Number.isInteger(metrics.rejected_moves)
+    ? formatObjective(metrics.rejected_moves)
     : "Not recorded";
 
   return (
-    <section className="overview-parameters overview-annealing" aria-label="Simulated annealing local optima">
-      <header><span>SIMULATED ANNEALING</span><h4>Local optima</h4></header>
+    <section className="overview-parameters overview-annealing" aria-label="Simulated annealing movement summary">
+      <header><span>SIMULATED ANNEALING</span><h4>Movement and stagnation</h4></header>
       <div className="parameter-grid">
         <div><span>Stuck frequency</span><strong title={metrics.stuck_frequency == null ? undefined : String(metrics.stuck_frequency)}>{frequency}</strong></div>
         <div><span>Stuck / completed iterations</span><strong>{iterations}</strong></div>
-        <div><span>Final state is a local optimum</span><strong>{finalOptimum}</strong></div>
+        <div><span>Accepted proposals</span><strong>{accepted}</strong></div>
+        <div><span>Rejected proposals</span><strong>{rejected}</strong></div>
       </div>
       <p className="overview-explanation">
-        An iteration counts as stuck when its state before the move has no valid neighbor with a higher objective value.
-        {" "}Frequency is stuck iterations divided by completed iterations.
+        An iteration counts as stuck when its proposed neighbor is rejected, so the current state does not change.
+        {" "}Frequency is rejected proposals divided by completed iterations.
       </p>
     </section>
   );

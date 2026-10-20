@@ -21,7 +21,11 @@ REQUIRED_METRICS = {
         "temperature_history",
         "stuck_frequency",
         "stuck_iterations",
-        "local_optimum_history",
+        "stuck_history",
+        "stuck_frequency_definition",
+        "rejection_rate",
+        "accepted_moves",
+        "rejected_moves",
     },
     "Genetic Algorithm": {
         "population_size",
